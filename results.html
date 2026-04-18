@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Results — KaliArena Organizer</title>
+  <link rel="icon" href="logo.png">
+  <link rel="stylesheet" href="css/app.css">
+  <style>
+    .sport-chip {
+      display:inline-flex;align-items:center;gap:.3rem;
+      padding:.2rem .55rem;border-radius:9999px;font-size:.7rem;font-weight:600;white-space:nowrap;
+    }
+    .sport-anyo-trad    { background:#ede9fe;color:#6d28d9; }
+    .sport-anyo-nontrad { background:#dbeafe;color:#1d4ed8; }
+    .sport-fc-padded    { background:#fef3c7;color:#92400e; }
+    .sport-fc-live      { background:#fee2e2;color:#991b1b; }
+
+    .step-badge {
+      display:inline-flex;align-items:center;justify-content:center;
+      width:1.5rem;height:1.5rem;border-radius:50%;
+      background:var(--primary);color:var(--primary-foreground);
+      font-size:.75rem;font-weight:700;flex-shrink:0;
+    }
+    .step-header { display:flex;align-items:center;gap:.625rem;font-weight:600;margin-bottom:.75rem; }
+
+    .result-preview-table { width:100%;border-collapse:collapse;font-size:.875rem;margin-top:.75rem; }
+    .result-preview-table th { background:var(--muted);padding:.5rem .625rem;text-align:left;font-size:.8125rem;border:1px solid var(--border); }
+    .result-preview-table td { padding:.5rem .625rem;border:1px solid var(--border); }
+    .result-preview-table tr:nth-child(even) td { background:var(--muted); }
+    .rank-gold   { color:#92400e;font-weight:700; }
+    .rank-silver { color:#52525b;font-weight:700; }
+    .rank-bronze { color:#92400e;font-weight:600; }
+
+    .results-card { border:1px solid var(--border);border-radius:.75rem;margin-bottom:1rem;overflow:hidden; }
+    .results-card-header {
+      padding:.875rem 1rem;background:var(--muted);
+      display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap;
+    }
+    .results-card-title { font-weight:600;font-size:.9375rem;display:flex;align-items:center;gap:.5rem; }
+  </style>
+</head>
+<body>
+  <div class="loading-overlay" id="loading-overlay"><div class="spinner"></div></div>
+
+  <!-- Confirm Publish Dialog -->
+  <div class="dialog-overlay hidden" id="publish-dialog">
+    <div class="dialog" style="max-width:30rem;">
+      <div class="dialog-title">Publish Results</div>
+      <p class="dialog-description">
+        This will make the results visible to coaches, admins, and the public.
+        Medal standings will be updated for all listed teams.
+        <strong>This action cannot be easily undone.</strong>
+      </p>
+      <div class="dialog-footer">
+        <button class="btn btn-secondary" onclick="closeDialog('publish-dialog')">Cancel</button>
+        <button class="btn btn-primary" onclick="confirmPublish()">
+          <i data-lucide="send"></i> Publish Now
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="app-shell hidden" id="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <img src="logo.png" alt="KaliArena" style="height:2rem;width:auto;object-fit:contain;flex-shrink:0;">
+        <span class="sidebar-logo-text">KaliArena</span>
+      </div>
+      <div class="sidebar-badge-area" id="sidebar-badge"></div>
+      <nav class="sidebar-nav" id="sidebar-nav"></nav>
+    </aside>
+
+    <div class="main-content">
+      <header class="portal-header">
+        <div class="header-left"><div class="header-title">Results</div></div>
+        <div class="header-right">
+          <span class="header-user-name" id="header-user-name"></span>
+          <div class="header-avatar" id="header-avatar">?</div>
+        </div>
+      </header>
+
+      <main class="page-content">
+        <div class="page-wrap">
+          <div class="page-header">
+            <div class="page-header-text">
+              <h1 class="page-title">Event Results</h1>
+              <p class="page-subtitle">Submit results from the controls, validate, and publish official standings.</p>
+            </div>
+          </div>
+
+          <!-- Tabs: Submit vs Published -->
+          <div style="display:flex;gap:.75rem;margin-bottom:1.25rem;border-bottom:2px solid var(--border);">
+            <button id="tab-submit-btn" class="tab-btn active" onclick="switchTab('submit')" style="padding:.625rem 1.125rem;font-size:.875rem;font-weight:500;border:none;background:none;cursor:pointer;color:var(--primary);border-bottom:2px solid var(--primary);margin-bottom:-2px;">Submit Results</button>
+            <button id="tab-published-btn" class="tab-btn" onclick="switchTab('published')" style="padding:.625rem 1.125rem;font-size:.875rem;font-weight:500;border:none;background:none;cursor:pointer;color:var(--muted-foreground);border-bottom:2px solid transparent;margin-bottom:-2px;">Published Results</button>
+          </div>
+
+          <!-- TAB: Submit Results -->
+          <div id="tab-submit">
+
+            <!-- Step 1: Event + Category -->
+            <div class="card" style="margin-bottom:1rem;">
+              <div class="card-content" style="padding:1.125rem;">
+                <div class="step-header"><span class="step-badge">1</span> Select Event &amp; Category</div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label class="form-label">Event</label>
+                    <select class="form-select" id="result-event" onchange="onResultEventChange()">
+                      <option value="">— select event —</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Division</label>
+                    <select class="form-select" id="result-division" onchange="onResultFilterChange()">
+                      <option value="">— select division —</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Sport Type</label>
+                    <select class="form-select" id="result-sport-type" onchange="onResultFilterChange()">
+                      <option value="">— select sport type —</option>
+                    </select>
+                  </div>
+                </div>
+                <div id="existing-result-notice" style="display:none;" class="alert alert-info" style="margin-top:.5rem;font-size:.8125rem;">
+                  <i data-lucide="info" style="width:.875rem;height:.875rem;flex-shrink:0;"></i>
+                  <span id="existing-result-text"></span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Step 2: Paste results -->
+            <div class="card" style="margin-bottom:1rem;">
+              <div class="card-content" style="padding:1.125rem;">
+                <div class="step-header"><span class="step-badge">2</span> Paste Controls Output</div>
+                <p class="text-sm text-muted" style="margin-bottom:.75rem;">
+                  From the controls (anyo or contact), click <strong>Export Results → Print / Save PDF</strong>.
+                  In the printed page, find the <em>Organizer Results Format</em> section and copy that text here.
+                </p>
+                <textarea id="result-raw-text" class="form-input" rows="10"
+                  placeholder="# KaliArena Anyo Results&#10;RANK|NAME|TEAM|CATEGORY|AVG|DEDUCTION|FINAL&#10;1|Janzen Egnisaban|CCS Arnis Team|Featherweight Boys 12-15|9.50|0.00|9.50&#10;..."
+                  style="font-family:monospace;font-size:.8125rem;" oninput="onRawTextChange()"></textarea>
+                <div style="display:flex;gap:.75rem;margin-top:.75rem;align-items:center;flex-wrap:wrap;">
+                  <button class="btn btn-secondary btn-sm" onclick="parseResults()">
+                    <i data-lucide="scan-text"></i> Parse &amp; Preview
+                  </button>
+                  <span id="parse-status" class="text-sm text-muted"></span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Step 3: Preview + Validate -->
+            <div id="preview-section" style="display:none;" class="card" style="margin-bottom:1rem;">
+              <div class="card-content" style="padding:1.125rem;">
+                <div class="step-header"><span class="step-badge">3</span> Review &amp; Validate</div>
+                <p class="text-sm text-muted" style="margin-bottom:.875rem;">
+                  Verify the results below are correct. You can edit the raw text in Step 2 and re-parse.
+                  Ranking 1 = Gold, 2 = Silver, 3 = Bronze for standings.
+                </p>
+                <div id="preview-table-container"></div>
+                <div class="alert alert-info" style="margin-top:1rem;font-size:.8125rem;">
+                  <i data-lucide="info" style="width:.875rem;height:.875rem;flex-shrink:0;"></i>
+                  Publishing will update team medal standings. Make sure all names match correctly.
+                </div>
+                <div style="display:flex;gap:.75rem;margin-top:1rem;flex-wrap:wrap;">
+                  <button class="btn btn-primary" id="publish-btn" onclick="openPublishDialog()">
+                    <i data-lucide="send"></i> Publish Results
+                  </button>
+                  <button class="btn btn-secondary" onclick="saveDraft()">
+                    <i data-lucide="save"></i> Save as Draft
+                  </button>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- TAB: Published Results -->
+          <div id="tab-published" style="display:none;">
+            <div class="card" style="margin-bottom:1rem;">
+              <div class="card-content" style="padding:1rem 1.25rem;">
+                <div style="display:flex;align-items:center;gap:.875rem;flex-wrap:wrap;">
+                  <label class="form-label" style="margin:0;white-space:nowrap;">Filter by Event</label>
+                  <select class="form-input" id="published-event-filter" style="flex:1;min-width:12rem;" onchange="loadPublishedResults()">
+                    <option value="">All events</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div id="published-list">
+              <div class="text-sm text-muted">Loading…</div>
+            </div>
+          </div>
+
+        </div>
+      </main>
+      <nav class="mobile-nav" id="mobile-nav"></nav>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/supabase-client.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/nav.js"></script>
+  <script>
+    const PAGE = 'results.html';
+    let userId;
+    let allEvents    = [];
+    let eventDivs    = [];
+    let eventSts     = [];
+    let parsedResults = null; // { type: 'anyo'|'contact', rows: [], rawText }
+
+    const SPORT_LABELS = {
+      'anyo-traditional':    'Anyo — Traditional',
+      'anyo-non-traditional':'Anyo — Non-Traditional',
+      'full-contact-padded': 'Full Contact — Padded',
+      'full-contact-livestick':'Full Contact — Live Stick',
+    };
+    const SPORT_CHIP_CLS = {
+      'anyo-traditional':    'sport-anyo-trad',
+      'anyo-non-traditional':'sport-anyo-nontrad',
+      'full-contact-padded': 'sport-fc-padded',
+      'full-contact-livestick':'sport-fc-live',
+    };
+
+    function sportLabel(st) { return SPORT_LABELS[st] || st; }
+    function sportCls(st)   { return SPORT_CHIP_CLS[st] || ''; }
+    function divisionLabel(d) {
+      const g   = d.gender === 'girls' ? 'Girls' : d.gender === 'mixed' ? 'Mixed' : 'Boys';
+      const age = (d.age_min && d.age_max) ? `${d.age_min}–${d.age_max}` : d.age_min ? `${d.age_min}+` : '';
+      return [d.weight_category, g, age].filter(Boolean).join(' · ');
+    }
+
+    // ── Init ──────────────────────────────────────────────────────
+    async function init() {
+      const ctx = await requireRole();
+      if (!ctx) return;
+      userId = ctx.session.user.id;
+      renderNav(PAGE);
+      setHeaderUser(ctx.profile);
+      await loadEvents();
+      showApp();
+      refreshIcons();
+    }
+
+    async function loadEvents() {
+      const { data } = await window.db
+        .from('competitions')
+        .select('id,name,status,start_date')
+        .eq('organizer_id', userId)
+        .eq('admin_approval_status', 'approved')
+        .order('start_date', { ascending: false });
+      allEvents = data || [];
+
+      const evSel = document.getElementById('result-event');
+      const evFilter = document.getElementById('published-event-filter');
+      const opts = allEvents.map(e => `<option value="${e.id}">${escHtml(e.name)}</option>`).join('');
+      evSel.innerHTML    = '<option value="">— select event —</option>' + opts;
+      evFilter.innerHTML = '<option value="">All events</option>' + opts;
+    }
+
+    // ── Tab switching ─────────────────────────────────────────────
+    function switchTab(name) {
+      document.getElementById('tab-submit').style.display    = name === 'submit'    ? '' : 'none';
+      document.getElementById('tab-published').style.display = name === 'published' ? '' : 'none';
+      document.getElementById('tab-submit-btn').style.cssText    = name === 'submit'
+        ? 'padding:.625rem 1.125rem;font-size:.875rem;font-weight:500;border:none;background:none;cursor:pointer;color:var(--primary);border-bottom:2px solid var(--primary);margin-bottom:-2px;'
+        : 'padding:.625rem 1.125rem;font-size:.875rem;font-weight:500;border:none;background:none;cursor:pointer;color:var(--muted-foreground);border-bottom:2px solid transparent;margin-bottom:-2px;';
+      document.getElementById('tab-published-btn').style.cssText = name === 'published'
+        ? 'padding:.625rem 1.125rem;font-size:.875rem;font-weight:500;border:none;background:none;cursor:pointer;color:var(--primary);border-bottom:2px solid var(--primary);margin-bottom:-2px;'
+        : 'padding:.625rem 1.125rem;font-size:.875rem;font-weight:500;border:none;background:none;cursor:pointer;color:var(--muted-foreground);border-bottom:2px solid transparent;margin-bottom:-2px;';
+      if (name === 'published') loadPublishedResults();
+      refreshIcons();
+    }
+
+    // ── Step 1: Event change ──────────────────────────────────────
+    async function onResultEventChange() {
+      const evId = document.getElementById('result-event').value;
+      document.getElementById('result-division').innerHTML    = '<option value="">— select division —</option>';
+      document.getElementById('result-sport-type').innerHTML  = '<option value="">— select sport type —</option>';
+      document.getElementById('preview-section').style.display = 'none';
+      document.getElementById('existing-result-notice').style.display = 'none';
+      parsedResults = null;
+      if (!evId) { eventDivs = []; eventSts = []; return; }
+
+      const [divsRes, stsRes] = await Promise.all([
+        window.db.from('event_divisions').select('id,gender,age_min,age_max,weight_category').eq('competition_id', evId),
+        window.db.from('event_sport_types').select('id,sport_type').eq('competition_id', evId),
+      ]);
+      eventDivs = divsRes.data || [];
+      eventSts  = stsRes.data  || [];
+
+      document.getElementById('result-division').innerHTML =
+        '<option value="">— select division —</option>' +
+        eventDivs.map(d => `<option value="${d.id}">${escHtml(divisionLabel(d))}</option>`).join('');
+
+      const stOptions = eventSts.length > 0
+        ? eventSts.map(s => s.sport_type)
+        : ['anyo-traditional','anyo-non-traditional','full-contact-padded','full-contact-livestick'];
+      document.getElementById('result-sport-type').innerHTML =
+        '<option value="">— select sport type —</option>' +
+        stOptions.map(st => `<option value="${st}">${escHtml(sportLabel(st))}</option>`).join('');
+    }
+
+    async function onResultFilterChange() {
+      const evId  = document.getElementById('result-event').value;
+      const divId = document.getElementById('result-division').value;
+      const st    = document.getElementById('result-sport-type').value;
+      if (!evId || !divId || !st) {
+        document.getElementById('existing-result-notice').style.display = 'none';
+        return;
+      }
+      // Check if a result already exists
+      const { data } = await window.db
+        .from('event_results')
+        .select('id,status,published_at')
+        .eq('competition_id', evId)
+        .eq('division_id', divId)
+        .eq('sport_type', st)
+        .maybeSingle();
+      const notice = document.getElementById('existing-result-notice');
+      const noticeText = document.getElementById('existing-result-text');
+      if (data) {
+        notice.style.display = '';
+        noticeText.textContent = data.status === 'published'
+          ? `Published result exists (${new Date(data.published_at).toLocaleDateString()}). Resubmitting will overwrite it.`
+          : 'A draft result exists for this category. Submitting will update it.';
+        refreshIcons();
+      } else {
+        notice.style.display = 'none';
+      }
+    }
+
+    function onRawTextChange() {
+      document.getElementById('parse-status').textContent = '';
+      document.getElementById('preview-section').style.display = 'none';
+      parsedResults = null;
+    }
+
+    // ── Step 2: Parse ─────────────────────────────────────────────
+    function parseResults() {
+      const raw  = document.getElementById('result-raw-text').value.trim();
+      const status = document.getElementById('parse-status');
+      if (!raw) { status.textContent = 'Paste results text first.'; return; }
+
+      // Detect type
+      const lines = raw.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
+
+      // Try to find the header line
+      const anyoHeader   = lines.find(l => /^RANK\|NAME\|TEAM/i.test(l));
+      const contactHeader = lines.find(l => /^BOUT\|RED/i.test(l));
+
+      if (!anyoHeader && !contactHeader) {
+        status.textContent = 'Unrecognized format. Expected "RANK|NAME|TEAM..." or "BOUT|RED|..." header.';
+        return;
+      }
+
+      let type, dataLines, rows = [];
+
+      if (anyoHeader) {
+        type = 'anyo';
+        const startIdx = lines.indexOf(anyoHeader) + 1;
+        dataLines = lines.slice(startIdx).filter(l => !l.startsWith('#') && !l.startsWith('RANK') && !l.startsWith('##') && l.includes('|'));
+        rows = dataLines.map(l => {
+          const [rank, name, team, category, avg, deduction, final_score] = l.split('|');
+          return {
+            rank:        parseInt(rank) || 0,
+            name:        (name        || '').trim(),
+            team:        (team        || '').trim(),
+            category:    (category    || '').trim(),
+            avg:         parseFloat(avg)         || 0,
+            deduction:   parseFloat(deduction)   || 0,
+            final_score: parseFloat(final_score) || 0,
+          };
+        }).filter(r => r.rank > 0 || r.name);
+
+      } else {
+        type = 'contact';
+        const startIdx = lines.indexOf(contactHeader) + 1;
+        dataLines = lines.slice(startIdx).filter(l => !l.startsWith('#') && !l.startsWith('BOUT') && !l.startsWith('##') && !l.startsWith('PLACE') && l.includes('|'));
+        rows = dataLines.map((l, i) => {
+          const [bout, red, red_team, red_pts, blue, blue_team, blue_pts, winner] = l.split('|');
+          return {
+            bout:      (bout      || '').trim() || ('Bout ' + (i+1)),
+            red:       (red       || '').trim(),
+            red_team:  (red_team  || '').trim(),
+            red_pts:   parseInt(red_pts)  || 0,
+            blue:      (blue      || '').trim(),
+            blue_team: (blue_team || '').trim(),
+            blue_pts:  parseInt(blue_pts) || 0,
+            winner:    (winner    || '').trim(),
+          };
+        });
+
+        // Also check for standings section
+        const standingsHeader = lines.find(l => /^PLACE\|NAME\|TEAM/i.test(l));
+        if (standingsHeader) {
+          const sIdx = lines.indexOf(standingsHeader) + 1;
+          const standingLines = lines.slice(sIdx).filter(l => l.includes('|') && !l.startsWith('PLACE'));
+          const standings = standingLines.map(l => {
+            const [place, name, team, category, medal] = l.split('|');
+            return { place: parseInt(place)||0, name:(name||'').trim(), team:(team||'').trim(), category:(category||'').trim(), medal:(medal||'').trim() };
+          });
+          rows._standings = standings;
+        }
+      }
+
+      if (rows.length === 0) {
+        status.textContent = 'Parsed 0 rows. Check the format.';
+        return;
+      }
+
+      parsedResults = { type, rows, rawText: raw };
+      status.textContent = `Parsed ${rows.length} ${type === 'anyo' ? 'performers' : 'bouts'} successfully.`;
+      renderPreview(type, rows);
+      document.getElementById('preview-section').style.display = '';
+      refreshIcons();
+    }
+
+    function renderPreview(type, rows) {
+      const container = document.getElementById('preview-table-container');
+      if (type === 'anyo') {
+        container.innerHTML =
+          '<table class="result-preview-table"><thead><tr>' +
+          '<th>#</th><th>Name</th><th>Team</th><th>Category</th><th>Avg</th><th>Deduction</th><th>Final</th><th>Medal</th>' +
+          '</tr></thead><tbody>' +
+          rows.map(r => {
+            const medalCls = r.rank === 1 ? 'rank-gold' : r.rank === 2 ? 'rank-silver' : r.rank === 3 ? 'rank-bronze' : '';
+            const medal    = r.rank === 1 ? '🥇 Gold' : r.rank === 2 ? '🥈 Silver' : r.rank === 3 ? '🥉 Bronze' : '';
+            return `<tr>
+              <td class="${medalCls}">${r.rank}</td>
+              <td>${escHtml(r.name)}</td>
+              <td>${escHtml(r.team)}</td>
+              <td>${escHtml(r.category)}</td>
+              <td>${r.avg.toFixed(2)}</td>
+              <td>${r.deduction.toFixed(2)}</td>
+              <td><strong>${r.final_score.toFixed(2)}</strong></td>
+              <td class="${medalCls}">${medal}</td>
+            </tr>`;
+          }).join('') +
+          '</tbody></table>';
+      } else {
+        // Contact: show bouts + standings
+        let html = '<table class="result-preview-table"><thead><tr>' +
+          '<th>Bout</th><th>Red</th><th>Red Team</th><th>Pts</th><th>Blue</th><th>Blue Team</th><th>Pts</th><th>Winner</th>' +
+          '</tr></thead><tbody>' +
+          rows.map(r => {
+            const wCls = r.winner === r.red ? 'rank-gold' : r.winner === r.blue ? 'rank-gold' : '';
+            return `<tr>
+              <td>${escHtml(r.bout)}</td>
+              <td>${escHtml(r.red)}</td><td>${escHtml(r.red_team)}</td><td>${r.red_pts}</td>
+              <td>${escHtml(r.blue)}</td><td>${escHtml(r.blue_team)}</td><td>${r.blue_pts}</td>
+              <td class="${wCls}"><strong>${escHtml(r.winner)}</strong></td>
+            </tr>`;
+          }).join('') +
+          '</tbody></table>';
+
+        if (rows._standings?.length > 0) {
+          html += '<h3 style="margin-top:1rem;font-size:.9375rem;">Final Standings</h3>';
+          html += '<table class="result-preview-table"><thead><tr><th>Place</th><th>Name</th><th>Team</th><th>Medal</th></tr></thead><tbody>' +
+            rows._standings.map(s => {
+              const cls = s.place===1?'rank-gold':s.place===2?'rank-silver':s.place===3?'rank-bronze':'';
+              const medal = s.place===1?'🥇 Gold':s.place===2?'🥈 Silver':s.place===3?'🥉 Bronze':'';
+              return `<tr><td class="${cls}">${s.place}</td><td>${escHtml(s.name)}</td><td>${escHtml(s.team)}</td><td class="${cls}">${medal||escHtml(s.medal)}</td></tr>`;
+            }).join('') +
+            '</tbody></table>';
+        }
+        container.innerHTML = html;
+      }
+    }
+
+    // ── Step 3: Save / Publish ────────────────────────────────────
+    function openPublishDialog() {
+      if (!validateSelections()) return;
+      openDialog('publish-dialog');
+    }
+
+    function validateSelections() {
+      if (!document.getElementById('result-event').value)      { showToast('Select an event.',     'error'); return false; }
+      if (!document.getElementById('result-division').value)   { showToast('Select a division.',   'error'); return false; }
+      if (!document.getElementById('result-sport-type').value) { showToast('Select a sport type.', 'error'); return false; }
+      if (!parsedResults)                                       { showToast('Parse results first.', 'error'); return false; }
+      return true;
+    }
+
+    async function saveDraft() {
+      if (!validateSelections()) return;
+      await upsertResult('draft');
+    }
+
+    async function confirmPublish() {
+      closeDialog('publish-dialog');
+      await upsertResult('published');
+    }
+
+    async function upsertResult(status) {
+      const evId  = document.getElementById('result-event').value;
+      const divId = document.getElementById('result-division').value;
+      const st    = document.getElementById('result-sport-type').value;
+
+      const payload = {
+        competition_id: evId,
+        division_id:    divId,
+        sport_type:     st,
+        raw_text:       parsedResults.rawText,
+        results_json:   parsedResults.rows,
+        status,
+        submitted_by:   userId,
+        submitted_at:   new Date().toISOString(),
+      };
+      if (status === 'published') {
+        payload.published_by = userId;
+        payload.published_at = new Date().toISOString();
+      }
+
+      // Upsert into event_results
+      const { error } = await window.db
+        .from('event_results')
+        .upsert(payload, { onConflict: 'competition_id,division_id,sport_type' });
+      if (error) { showToast('Save failed: ' + error.message, 'error'); return; }
+
+      if (status === 'published') {
+        await updateTeamStandings(evId, parsedResults);
+        showToast('Results published! Team standings updated.', 'success');
+        document.getElementById('result-raw-text').value = '';
+        document.getElementById('preview-section').style.display = 'none';
+        parsedResults = null;
+        switchTab('published');
+      } else {
+        showToast('Draft saved.', 'success');
+      }
+    }
+
+    async function updateTeamStandings(evId, parsed) {
+      // Build medal tally: { teamName: { gold, silver, bronze } }
+      const tally = {};
+      const bump = (team, medal) => {
+        if (!team) return;
+        if (!tally[team]) tally[team] = { gold:0, silver:0, bronze:0 };
+        if (medal === 'gold')   tally[team].gold++;
+        if (medal === 'silver') tally[team].silver++;
+        if (medal === 'bronze') tally[team].bronze++;
+      };
+
+      if (parsed.type === 'anyo') {
+        parsed.rows.forEach(r => {
+          const medal = r.rank === 1 ? 'gold' : r.rank === 2 ? 'silver' : r.rank === 3 ? 'bronze' : null;
+          if (medal) bump(r.team, medal);
+        });
+      } else {
+        const standings = parsed.rows._standings || [];
+        standings.forEach(s => {
+          const medal = s.place === 1 ? 'gold' : s.place === 2 ? 'silver' : s.place === 3 ? 'bronze' : null;
+          if (medal) bump(s.team, medal);
+        });
+      }
+
+      if (Object.keys(tally).length === 0) return;
+
+      // Look up team IDs by name
+      const teamNames = Object.keys(tally);
+      const { data: teams } = await window.db
+        .from('teams')
+        .select('id,name')
+        .in('name', teamNames);
+
+      if (!teams?.length) return;
+
+      // Upsert standings
+      const rows = teams.map(t => {
+        const m = tally[t.name] || { gold:0, silver:0, bronze:0 };
+        return {
+          competition_id: evId,
+          team_id:        t.id,
+          gold:           m.gold,
+          silver:         m.silver,
+          bronze:         m.bronze,
+          total_points:   (m.gold * 3) + (m.silver * 2) + m.bronze,
+          updated_at:     new Date().toISOString(),
+        };
+      });
+
+      await window.db.from('team_event_standings').upsert(rows, { onConflict: 'competition_id,team_id' });
+    }
+
+    // ── Published Results Tab ─────────────────────────────────────
+    async function loadPublishedResults() {
+      const evId = document.getElementById('published-event-filter').value;
+      const el   = document.getElementById('published-list');
+      el.innerHTML = '<div class="text-sm text-muted">Loading…</div>';
+
+      let q = window.db
+        .from('event_results')
+        .select(`
+          id, status, sport_type, published_at, submitted_at,
+          competitions(id,name),
+          event_divisions(id,gender,age_min,age_max,weight_category)
+        `)
+        .eq('status', 'published');
+      if (evId) q = q.eq('competition_id', evId);
+      // Only show own events
+      // (RLS handles organizer_id check)
+
+      const { data } = await q.order('published_at', { ascending: false });
+      const results = data || [];
+
+      if (results.length === 0) {
+        el.innerHTML = `<div class="empty-state"><i data-lucide="trophy"></i><h3>No published results</h3><p>Submitted and published results will appear here.</p></div>`;
+        refreshIcons(); return;
+      }
+
+      el.innerHTML = results.map(r => {
+        const div = r.event_divisions;
+        const ev  = r.competitions;
+        return `
+          <div class="results-card">
+            <div class="results-card-header">
+              <div class="results-card-title">
+                <span class="sport-chip ${sportCls(r.sport_type)}">${escHtml(sportLabel(r.sport_type))}</span>
+                ${div ? `<span class="badge ${div.gender==='girls'?'badge-primary':div.gender==='mixed'?'badge-gray':'badge-blue'}" style="font-size:.7rem;">${escHtml(divisionLabel(div))}</span>` : ''}
+                <span class="text-sm text-muted">${ev ? escHtml(ev.name) : ''}</span>
+              </div>
+              <div class="text-xs text-muted">
+                Published ${r.published_at ? new Date(r.published_at).toLocaleDateString() : '—'}
+              </div>
+            </div>
+          </div>`;
+      }).join('');
+      refreshIcons();
+    }
+
+    init();
+  </script>
+</body>
+</html>

@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Registrations & Roster — KaliArena Organizer</title>
+  <link rel="icon" href="logo.png">
+  <link rel="stylesheet" href="css/app.css">
+  <style>
+    /* ── Tabs ─────────────────────────────────────────────────── */
+    .tab-bar { display:flex; gap:0; border-bottom:2px solid var(--border); margin-bottom:1.25rem; }
+    .tab-btn {
+      padding:.625rem 1.125rem; font-size:.875rem; font-weight:500;
+      border:none; background:none; cursor:pointer; color:var(--muted-foreground);
+      border-bottom:2px solid transparent; margin-bottom:-2px; transition:all .15s;
+    }
+    .tab-btn.active { color:var(--primary); border-bottom-color:var(--primary); }
+    .tab-panel { display:none; }
+    .tab-panel.active { display:block; }
+
+    /* ── Sport chips ─────────────────────────────────────────── */
+    .sport-chip {
+      display:inline-flex;align-items:center;gap:.3rem;
+      padding:.2rem .55rem;border-radius:9999px;font-size:.7rem;font-weight:600;white-space:nowrap;
+    }
+    .sport-anyo-trad    { background:#ede9fe;color:#6d28d9; }
+    .sport-anyo-nontrad { background:#dbeafe;color:#1d4ed8; }
+    .sport-fc-padded    { background:#fef3c7;color:#92400e; }
+    .sport-fc-live      { background:#fee2e2;color:#991b1b; }
+
+    /* ── Registration group ──────────────────────────────────── */
+    .reg-group { border:1px solid var(--border); border-radius:.75rem; margin-bottom:1rem; overflow:hidden; }
+    .reg-group-header {
+      padding:.75rem 1rem; background:var(--muted);
+      display:flex; align-items:center; justify-content:space-between; gap:.75rem; flex-wrap:wrap;
+    }
+    .reg-group-title { font-weight:600; font-size:.875rem; display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; }
+    .reg-row {
+      display:flex; align-items:center; gap:.75rem; padding:.75rem 1rem;
+      border-bottom:1px solid var(--border);
+    }
+    .reg-row:last-child { border-bottom:none; }
+    .reg-row .player-name { font-size:.875rem; font-weight:500; flex:1; min-width:0; }
+    .reg-row .team-name   { font-size:.8125rem; color:var(--muted-foreground); width:10rem; flex-shrink:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+    /* ── Venue card ──────────────────────────────────────────── */
+    .venue-card { border:1px solid var(--border); border-radius:.75rem; padding:1rem; margin-bottom:.875rem; }
+    .venue-header { display:flex; align-items:center; justify-content:space-between; gap:.75rem; flex-wrap:wrap; margin-bottom:.75rem; }
+    .venue-title { font-weight:600; font-size:.9375rem; }
+    .assignment-row { display:flex; align-items:center; gap:.5rem; padding:.375rem 0; border-bottom:1px solid var(--border); }
+    .assignment-row:last-child { border-bottom:none; }
+
+    /* ── Print / PDF ─────────────────────────────────────────── */
+    .roster-preview { font-family:monospace; font-size:.8125rem; background:var(--muted); border:1px solid var(--border); border-radius:.5rem; padding:.875rem 1rem; white-space:pre-wrap; overflow-x:auto; margin-top:.875rem; max-height:20rem; overflow-y:auto; }
+    @media print {
+      body > *:not(#print-area) { display:none !important; }
+      #print-area { display:block !important; font-family: Arial, sans-serif; }
+      .print-page { page-break-after:always; padding:1.5rem; }
+      .print-page:last-child { page-break-after:auto; }
+      .print-header { margin-bottom:1rem; border-bottom:2px solid #000; padding-bottom:.75rem; }
+      .print-title  { font-size:1.25rem; font-weight:bold; margin:0 0 .25rem; }
+      .print-meta   { font-size:.875rem; color:#555; }
+      .print-table  { width:100%; border-collapse:collapse; margin-top:1rem; }
+      .print-table th { background:#f0f0f0; font-size:.8125rem; text-align:left; padding:.5rem .625rem; border:1px solid #ccc; }
+      .print-table td { font-size:.8125rem; padding:.4375rem .625rem; border:1px solid #ccc; }
+      .print-table tr:nth-child(even) td { background:#fafafa; }
+      .print-pipe-block { font-family:monospace; font-size:.75rem; margin-top:1rem; background:#f9f9f9; padding:.75rem; border:1px solid #ddd; white-space:pre; }
+      .print-pipe-label { font-size:.75rem; font-weight:bold; margin-top:.875rem; margin-bottom:.25rem; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Hidden print area (only visible during print) -->
+  <div id="print-area" style="display:none;"></div>
+
+  <!-- Reject Dialog -->
+  <div class="dialog-overlay hidden" id="reject-dialog">
+    <div class="dialog" style="max-width:28rem;">
+      <div class="dialog-title">Reject Registration</div>
+      <p class="dialog-description">Optionally provide a reason for the coach.</p>
+      <input type="hidden" id="reject-reg-id">
+      <div class="form-group" style="margin-top:.75rem;">
+        <label class="form-label">Reason (optional)</label>
+        <textarea id="reject-reason" class="form-input" rows="2" placeholder="e.g. Player does not meet age requirements"></textarea>
+      </div>
+      <div class="dialog-footer">
+        <button class="btn btn-secondary" onclick="closeDialog('reject-dialog')">Cancel</button>
+        <button class="btn btn-destructive" onclick="confirmReject()">Reject</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Venue Assignment Dialog -->
+  <div class="dialog-overlay hidden" id="assign-dialog">
+    <div class="dialog" style="max-width:32rem;">
+      <div class="dialog-title">Assign Categories to Venue</div>
+      <p class="dialog-description" id="assign-venue-name" style="font-weight:600;"></p>
+      <input type="hidden" id="assign-venue-id">
+      <p class="dialog-description" style="margin-top:-.25rem;">Select which division + sport type this venue will handle:</p>
+      <div id="assign-category-list" style="max-height:18rem;overflow-y:auto;margin-top:.875rem;display:flex;flex-direction:column;gap:.375rem;"></div>
+      <div class="dialog-footer">
+        <button class="btn btn-secondary" onclick="closeDialog('assign-dialog')">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="app-shell hidden" id="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <img src="logo.png" alt="KaliArena" style="height:2rem;width:auto;object-fit:contain;flex-shrink:0;">
+        <span class="sidebar-logo-text">KaliArena</span>
+      </div>
+      <div class="sidebar-badge-area" id="sidebar-badge"></div>
+      <nav class="sidebar-nav" id="sidebar-nav"></nav>
+    </aside>
+
+    <div class="main-content">
+      <header class="portal-header">
+        <div class="header-left"><div class="header-title">Registrations &amp; Roster</div></div>
+        <div class="header-right">
+          <span class="header-user-name" id="header-user-name"></span>
+          <div class="header-avatar" id="header-avatar">?</div>
+        </div>
+      </header>
+
+      <main class="page-content">
+        <div class="page-wrap">
+          <div class="page-header">
+            <div class="page-header-text">
+              <h1 class="page-title">Registrations &amp; Roster</h1>
+              <p class="page-subtitle">Review player registrations, manage venues, and generate roster PDFs for controls.</p>
+            </div>
+          </div>
+
+          <!-- Event Picker -->
+          <div class="card" style="margin-bottom:1.25rem;">
+            <div class="card-content" style="padding:1rem 1.25rem;">
+              <div style="display:flex;align-items:center;gap:.875rem;flex-wrap:wrap;">
+                <label class="form-label" style="margin:0;white-space:nowrap;">Event</label>
+                <select class="form-input" id="event-select" style="flex:1;min-width:14rem;" onchange="onEventChange()">
+                  <option value="">— select your event —</option>
+                </select>
+                <div id="event-summary" style="font-size:.8125rem;color:var(--muted-foreground);white-space:nowrap;"></div>
+              </div>
+            </div>
+          </div>
+
+          <div id="no-event-state">
+            <div class="empty-state">
+              <i data-lucide="list-checks"></i>
+              <h3>No event selected</h3>
+              <p>Choose an approved event above to manage registrations and generate roster PDFs.</p>
+            </div>
+          </div>
+
+          <div id="event-workspace" style="display:none;">
+            <!-- Tabs -->
+            <div class="tab-bar">
+              <button class="tab-btn active" onclick="switchTab('registrations')">
+                <i data-lucide="users" style="width:.875rem;height:.875rem;display:inline;vertical-align:middle;margin-right:.25rem;"></i>
+                Registrations
+              </button>
+              <button class="tab-btn" onclick="switchTab('venues')">
+                <i data-lucide="building-2" style="width:.875rem;height:.875rem;display:inline;vertical-align:middle;margin-right:.25rem;"></i>
+                Venues
+              </button>
+              <button class="tab-btn" onclick="switchTab('roster')">
+                <i data-lucide="printer" style="width:.875rem;height:.875rem;display:inline;vertical-align:middle;margin-right:.25rem;"></i>
+                Roster PDF
+              </button>
+            </div>
+
+            <!-- TAB 1: Registrations -->
+            <div id="tab-registrations" class="tab-panel active"></div>
+
+            <!-- TAB 2: Venues -->
+            <div id="tab-venues" class="tab-panel">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:.75rem;">
+                <div>
+                  <div class="font-semibold">Venues / Courts</div>
+                  <div class="text-sm text-muted">Each venue handles specific division + sport type categories.</div>
+                </div>
+                <button class="btn btn-primary btn-sm" onclick="openAddVenueForm()">
+                  <i data-lucide="plus"></i> Add Venue
+                </button>
+              </div>
+
+              <!-- Add Venue inline form -->
+              <div id="add-venue-form" style="display:none;" class="card" style="margin-bottom:1rem;">
+                <div class="card-content" style="padding:1rem;">
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label class="form-label">Venue / Court Name *</label>
+                      <input type="text" id="new-venue-name" class="form-input" placeholder="e.g. Court A, Main Gym">
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Sub-location (optional)</label>
+                      <input type="text" id="new-venue-location" class="form-input" placeholder="e.g. Hall 2, Building B">
+                    </div>
+                  </div>
+                  <div class="flex gap-2">
+                    <button class="btn btn-primary btn-sm" onclick="saveNewVenue()"><i data-lucide="save"></i> Save Venue</button>
+                    <button class="btn btn-secondary btn-sm" onclick="document.getElementById('add-venue-form').style.display='none'">Cancel</button>
+                  </div>
+                </div>
+              </div>
+
+              <div id="venues-list"><div class="text-sm text-muted">Loading…</div></div>
+            </div>
+
+            <!-- TAB 3: Roster PDF -->
+            <div id="tab-roster" class="tab-panel">
+              <div class="card">
+                <div class="card-content" style="padding:1.125rem;">
+                  <div class="font-semibold" style="margin-bottom:.875rem;">Generate Roster PDF</div>
+
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label class="form-label">Sport Type</label>
+                      <select class="form-select" id="roster-sport-type" onchange="onRosterFilterChange()">
+                        <option value="">All sport types</option>
+                      </select>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Division</label>
+                      <select class="form-select" id="roster-division" onchange="onRosterFilterChange()">
+                        <option value="">All divisions</option>
+                      </select>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Venue / Court (optional)</label>
+                      <input type="text" id="roster-venue-name" class="form-input" placeholder="e.g. Court A" oninput="onRosterFilterChange()">
+                    </div>
+                  </div>
+
+                  <div style="display:flex;align-items:center;gap:.625rem;margin-bottom:.75rem;flex-wrap:wrap;">
+                    <label style="display:flex;align-items:center;gap:.375rem;font-size:.8125rem;cursor:pointer;">
+                      <input type="checkbox" id="roster-confirmed-only" checked onchange="onRosterFilterChange()"
+                             style="width:.875rem;height:.875rem;accent-color:var(--primary);">
+                      Confirmed players only
+                    </label>
+                    <span id="roster-count" class="badge badge-gray" style="font-size:.7rem;"></span>
+                  </div>
+
+                  <div class="flex gap-2 flex-wrap">
+                    <button class="btn btn-primary btn-sm" onclick="printRoster()">
+                      <i data-lucide="printer"></i> Print / Save PDF
+                    </button>
+                    <button class="btn btn-secondary btn-sm" onclick="copyRosterText()">
+                      <i data-lucide="copy"></i> Copy Pipe Text
+                    </button>
+                  </div>
+
+                  <div id="roster-preview-container">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:1rem;margin-bottom:.375rem;">
+                      <span class="text-xs text-muted font-medium">PIPE-DELIMITED PREVIEW (paste this into controls)</span>
+                    </div>
+                    <div class="roster-preview" id="roster-preview">Select filters above to preview the roster.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </main>
+      <nav class="mobile-nav" id="mobile-nav"></nav>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/supabase-client.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/nav.js"></script>
+  <script>
+    const PAGE = 'brackets.html';
+    let userId;
+    let allEvents   = [];
+    let currentEvId = null;
+    let currentEvName = '';
+    let allRegs     = [];  // event_player_registrations rows
+    let eventDivs   = [];  // event_divisions rows
+    let eventSts    = [];  // event_sport_types rows
+    let eventVenues = [];  // event_venues rows with assignments
+
+    const SPORT_LABELS = {
+      'anyo-traditional':    'Anyo — Traditional',
+      'anyo-non-traditional':'Anyo — Non-Traditional',
+      'full-contact-padded': 'Full Contact — Padded',
+      'full-contact-livestick':'Full Contact — Live Stick',
+    };
+    const SPORT_CHIP_CLS = {
+      'anyo-traditional':    'sport-anyo-trad',
+      'anyo-non-traditional':'sport-anyo-nontrad',
+      'full-contact-padded': 'sport-fc-padded',
+      'full-contact-livestick':'sport-fc-live',
+    };
+
+    function sportLabel(st) { return SPORT_LABELS[st] || st; }
+    function sportCls(st)   { return SPORT_CHIP_CLS[st] || ''; }
+
+    function divisionLabel(d) {
+      const g   = d.gender === 'girls' ? 'Girls' : d.gender === 'mixed' ? 'Mixed' : 'Boys';
+      const age = (d.age_min && d.age_max) ? `${d.age_min}–${d.age_max}`
+                : d.age_min ? `${d.age_min}+` : d.age_max ? `U${d.age_max}` : '';
+      return [d.weight_category, g, age].filter(Boolean).join(' · ');
+    }
+    function divisionBadgeCls(d) {
+      return d.gender === 'girls' ? 'badge-primary' : d.gender === 'mixed' ? 'badge-gray' : 'badge-blue';
+    }
+
+    // ── Init ──────────────────────────────────────────────────────
+    async function init() {
+      const ctx = await requireRole();
+      if (!ctx) return;
+      userId = ctx.session.user.id;
+      renderNav(PAGE);
+      setHeaderUser(ctx.profile);
+      await loadEvents();
+      // Auto-select event from URL param
+      const params = new URLSearchParams(location.search);
+      const evParam = params.get('ev');
+      if (evParam) {
+        document.getElementById('event-select').value = evParam;
+        await onEventChange();
+      }
+      showApp();
+      refreshIcons();
+    }
+
+    async function loadEvents() {
+      const { data } = await window.db
+        .from('competitions')
+        .select('id,name,status,admin_approval_status,start_date')
+        .eq('organizer_id', userId)
+        .eq('admin_approval_status', 'approved')
+        .order('start_date', { ascending: false });
+      allEvents = data || [];
+      const sel = document.getElementById('event-select');
+      sel.innerHTML = '<option value="">— select your event —</option>' +
+        allEvents.map(e => `<option value="${e.id}">${escHtml(e.name)}</option>`).join('');
+    }
+
+    async function onEventChange() {
+      const evId = document.getElementById('event-select').value;
+      if (!evId) {
+        document.getElementById('no-event-state').style.display = '';
+        document.getElementById('event-workspace').style.display = 'none';
+        currentEvId = null;
+        return;
+      }
+      currentEvId   = evId;
+      currentEvName = allEvents.find(e => e.id === evId)?.name || '';
+      document.getElementById('no-event-state').style.display = 'none';
+      document.getElementById('event-workspace').style.display = '';
+      await loadEventData(evId);
+    }
+
+    async function loadEventData(evId) {
+      const [regsRes, divsRes, stsRes, venuesRes] = await Promise.all([
+        window.db
+          .from('event_player_registrations')
+          .select(`
+            id, status, sport_type, rejection_reason, created_at,
+            event_divisions(id,gender,age_min,age_max,weight_category),
+            players(id,name),
+            teams(id,name)
+          `)
+          .eq('competition_id', evId)
+          .order('sport_type').order('created_at'),
+
+        window.db
+          .from('event_divisions')
+          .select('id,gender,age_min,age_max,weight_category')
+          .eq('competition_id', evId),
+
+        window.db
+          .from('event_sport_types')
+          .select('id,sport_type')
+          .eq('competition_id', evId),
+
+        window.db
+          .from('event_venues')
+          .select(`
+            id,name,location,
+            venue_assignments(
+              id,sport_type,
+              event_divisions(id,gender,age_min,age_max,weight_category)
+            )
+          `)
+          .eq('competition_id', evId),
+      ]);
+
+      allRegs     = regsRes.data   || [];
+      eventDivs   = divsRes.data   || [];
+      eventSts    = stsRes.data    || [];
+      eventVenues = venuesRes.data || [];
+
+      const total   = allRegs.length;
+      const pending = allRegs.filter(r => r.status === 'pending').length;
+      document.getElementById('event-summary').textContent =
+        `${total} registrations · ${pending} pending`;
+
+      renderRegistrationsTab();
+      renderVenuesTab();
+      renderRosterFilters();
+      onRosterFilterChange();
+      refreshIcons();
+    }
+
+    // ── Tab switching ─────────────────────────────────────────────
+    function switchTab(name) {
+      document.querySelectorAll('.tab-btn').forEach((b, i) => {
+        const names = ['registrations','venues','roster'];
+        b.classList.toggle('active', names[i] === name);
+      });
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      document.getElementById('tab-' + name).classList.add('active');
+      refreshIcons();
+    }
+
+    // ── Registrations Tab ─────────────────────────────────────────
+    function renderRegistrationsTab() {
+      const el = document.getElementById('tab-registrations');
+
+      if (allRegs.length === 0) {
+        el.innerHTML = `<div class="empty-state"><i data-lucide="inbox"></i><h3>No registrations yet</h3><p>Coaches haven't registered any players for this event.</p></div>`;
+        refreshIcons(); return;
+      }
+
+      // Group by sport_type then division_id
+      const groups = {};
+      allRegs.forEach(r => {
+        const key = r.sport_type + '|||' + (r.event_divisions?.id || 'none');
+        if (!groups[key]) groups[key] = { sport_type: r.sport_type, div: r.event_divisions, rows: [] };
+        groups[key].rows.push(r);
+      });
+
+      el.innerHTML = Object.values(groups).map(g => {
+        const pending   = g.rows.filter(r => r.status === 'pending').length;
+        const confirmed = g.rows.filter(r => r.status === 'confirmed').length;
+        const rejected  = g.rows.filter(r => r.status === 'rejected').length;
+        return `
+          <div class="reg-group">
+            <div class="reg-group-header">
+              <div class="reg-group-title">
+                <span class="sport-chip ${sportCls(g.sport_type)}">${escHtml(sportLabel(g.sport_type))}</span>
+                ${g.div ? `<span class="badge ${divisionBadgeCls(g.div)} ml-1">${escHtml(divisionLabel(g.div))}</span>` : ''}
+                <span class="text-xs text-muted" style="font-weight:400;">
+                  ${confirmed} confirmed · ${pending} pending · ${rejected} rejected
+                </span>
+              </div>
+              ${pending > 0 ? `
+                <button class="btn btn-primary btn-sm"
+                        onclick="confirmAllPending(${JSON.stringify(g.rows.filter(r=>r.status==='pending').map(r=>r.id)).replace(/"/g,'&quot;')})">
+                  <i data-lucide="check-check"></i> Confirm All (${pending})
+                </button>` : ''}
+            </div>
+            ${g.rows.map(r => renderRegRow(r)).join('')}
+          </div>`;
+      }).join('');
+
+      refreshIcons();
+    }
+
+    function renderRegRow(r) {
+      const statusMap = {
+        pending:   ['badge-gray',   'Pending'],
+        confirmed: ['badge-success','Confirmed'],
+        rejected:  ['badge-error',  'Rejected'],
+      };
+      const [badgeCls, badgeLabel] = statusMap[r.status] || ['badge-gray','Unknown'];
+      return `
+        <div class="reg-row" id="regrow-${r.id}">
+          <div class="player-name">${escHtml(r.players?.name || '—')}</div>
+          <div class="team-name">${escHtml(r.teams?.name || '—')}</div>
+          <span class="badge ${badgeCls}" style="font-size:.7rem;flex-shrink:0;">${badgeLabel}</span>
+          <div class="flex gap-1" style="flex-shrink:0;">
+            ${r.status !== 'confirmed' ? `
+              <button class="btn btn-primary btn-sm" style="padding:.25rem .5rem;" title="Confirm"
+                      onclick="updateRegStatus('${r.id}','confirmed')">
+                <i data-lucide="check" style="width:.8rem;height:.8rem;"></i>
+              </button>` : ''}
+            ${r.status !== 'rejected' ? `
+              <button class="btn btn-destructive btn-sm" style="padding:.25rem .5rem;" title="Reject"
+                      onclick="openRejectDialog('${r.id}')">
+                <i data-lucide="x" style="width:.8rem;height:.8rem;"></i>
+              </button>` : ''}
+          </div>
+          ${r.rejection_reason ? `<div class="text-xs" style="color:var(--destructive);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:12rem;">${escHtml(r.rejection_reason)}</div>` : ''}
+        </div>`;
+    }
+
+    async function updateRegStatus(id, status, reason) {
+      const upd = { status };
+      if (reason) upd.rejection_reason = reason;
+      const { error } = await window.db
+        .from('event_player_registrations')
+        .update(upd)
+        .eq('id', id);
+      if (error) { showToast('Update failed: ' + error.message, 'error'); return; }
+      await loadEventData(currentEvId);
+      refreshIcons();
+    }
+
+    async function confirmAllPending(ids) {
+      if (!ids.length) return;
+      const { error } = await window.db
+        .from('event_player_registrations')
+        .update({ status: 'confirmed' })
+        .in('id', ids);
+      if (error) { showToast('Failed: ' + error.message, 'error'); return; }
+      showToast(`${ids.length} players confirmed.`, 'success');
+      await loadEventData(currentEvId);
+      refreshIcons();
+    }
+
+    function openRejectDialog(id) {
+      document.getElementById('reject-reg-id').value = id;
+      document.getElementById('reject-reason').value = '';
+      openDialog('reject-dialog');
+    }
+
+    async function confirmReject() {
+      const id     = document.getElementById('reject-reg-id').value;
+      const reason = document.getElementById('reject-reason').value.trim() || null;
+      closeDialog('reject-dialog');
+      await updateRegStatus(id, 'rejected', reason);
+    }
+
+    // ── Venues Tab ────────────────────────────────────────────────
+    function renderVenuesTab() {
+      const el = document.getElementById('venues-list');
+      if (eventVenues.length === 0) {
+        el.innerHTML = `<div class="empty-state" style="padding:2rem 1rem;"><i data-lucide="building-2"></i><h3>No venues yet</h3><p>Add venues above, then assign which categories each handles.</p></div>`;
+        refreshIcons(); return;
+      }
+      el.innerHTML = eventVenues.map(v => {
+        const assignments = v.venue_assignments || [];
+        return `
+          <div class="venue-card">
+            <div class="venue-header">
+              <div>
+                <div class="venue-title">${escHtml(v.name)}</div>
+                ${v.location ? `<div class="text-sm text-muted">${escHtml(v.location)}</div>` : ''}
+              </div>
+              <div class="flex gap-2">
+                <button class="btn btn-secondary btn-sm" onclick="openAssignDialog('${v.id}','${escHtml(v.name).replace(/'/g,"\\'")}')">
+                  <i data-lucide="tag"></i> Assign Categories
+                </button>
+                <button class="btn btn-secondary btn-sm" onclick="generateVenueRoster('${v.id}')">
+                  <i data-lucide="printer"></i> Print Roster
+                </button>
+                <button class="btn btn-secondary btn-sm" onclick="deleteVenue('${v.id}','${escHtml(v.name).replace(/'/g,"\\'")}')">
+                  <i data-lucide="trash-2"></i>
+                </button>
+              </div>
+            </div>
+            ${assignments.length === 0
+              ? `<p class="text-sm text-muted">No categories assigned yet.</p>`
+              : `<div>${assignments.map(a => `
+                  <div class="assignment-row">
+                    <span class="sport-chip ${sportCls(a.sport_type)}">${escHtml(sportLabel(a.sport_type))}</span>
+                    ${a.event_divisions ? `<span class="badge ${divisionBadgeCls(a.event_divisions)}" style="font-size:.7rem;">${escHtml(divisionLabel(a.event_divisions))}</span>` : ''}
+                    <button class="btn btn-secondary btn-sm" style="padding:.2rem .4rem;margin-left:auto;"
+                            onclick="removeAssignment('${a.id}')">
+                      <i data-lucide="x" style="width:.75rem;height:.75rem;"></i>
+                    </button>
+                  </div>`).join('')}
+              </div>`}
+          </div>`;
+      }).join('');
+      refreshIcons();
+    }
+
+    function openAddVenueForm() {
+      document.getElementById('add-venue-form').style.display = '';
+      document.getElementById('new-venue-name').focus();
+    }
+
+    async function saveNewVenue() {
+      const name     = document.getElementById('new-venue-name').value.trim();
+      const location = document.getElementById('new-venue-location').value.trim() || null;
+      if (!name) { showToast('Enter a venue name.', 'error'); return; }
+      const { error } = await window.db.from('event_venues')
+        .insert({ competition_id: currentEvId, name, location });
+      if (error) { showToast('Failed: ' + error.message, 'error'); return; }
+      document.getElementById('add-venue-form').style.display = 'none';
+      document.getElementById('new-venue-name').value = '';
+      document.getElementById('new-venue-location').value = '';
+      showToast('Venue added.', 'success');
+      await loadEventData(currentEvId);
+      switchTab('venues');
+      refreshIcons();
+    }
+
+    async function deleteVenue(id, name) {
+      if (!confirmAction(`Delete venue "${name}"?`)) return;
+      const { error } = await window.db.from('event_venues').delete().eq('id', id);
+      if (error) { showToast('Failed: ' + error.message, 'error'); return; }
+      showToast('Venue deleted.', 'success');
+      await loadEventData(currentEvId);
+      refreshIcons();
+    }
+
+    // Assign Dialog
+    function openAssignDialog(venueId, venueName) {
+      document.getElementById('assign-venue-id').value  = venueId;
+      document.getElementById('assign-venue-name').textContent = venueName;
+
+      const venue       = eventVenues.find(v => v.id === venueId);
+      const existing    = new Set(
+        (venue?.venue_assignments || []).map(a => a.sport_type + '|' + (a.event_divisions?.id || ''))
+      );
+
+      const stOptions = eventSts.length > 0
+        ? eventSts.map(s => s.sport_type)
+        : ['anyo-traditional','anyo-non-traditional','full-contact-padded','full-contact-livestick'];
+
+      const list = document.getElementById('assign-category-list');
+      list.innerHTML = stOptions.flatMap(st =>
+        eventDivs.map(d => {
+          const key   = st + '|' + d.id;
+          const taken = existing.has(key);
+          return `
+            <label style="display:flex;align-items:center;gap:.625rem;padding:.375rem .5rem;border-radius:.375rem;cursor:pointer;${taken?'opacity:.5;pointer-events:none;':''}">
+              <input type="checkbox" ${taken ? 'checked disabled' : ''}
+                     style="width:.875rem;height:.875rem;accent-color:var(--primary);"
+                     onchange="toggleAssignment('${venueId}','${d.id}','${st}',this.checked)">
+              <span class="sport-chip ${sportCls(st)}">${escHtml(sportLabel(st))}</span>
+              <span class="badge ${divisionBadgeCls(d)}" style="font-size:.7rem;">${escHtml(divisionLabel(d))}</span>
+            </label>`;
+        })
+      ).join('');
+
+      openDialog('assign-dialog');
+      refreshIcons();
+    }
+
+    async function toggleAssignment(venueId, divId, sportType, checked) {
+      if (checked) {
+        const { error } = await window.db.from('venue_assignments')
+          .insert({ venue_id: venueId, division_id: divId, sport_type: sportType });
+        if (error) { showToast('Failed: ' + error.message, 'error'); return; }
+      }
+      await loadEventData(currentEvId);
+      openAssignDialog(venueId, document.getElementById('assign-venue-name').textContent);
+      refreshIcons();
+    }
+
+    async function removeAssignment(id) {
+      const { error } = await window.db.from('venue_assignments').delete().eq('id', id);
+      if (error) { showToast('Failed: ' + error.message, 'error'); return; }
+      await loadEventData(currentEvId);
+      refreshIcons();
+    }
+
+    // ── Roster PDF Tab ────────────────────────────────────────────
+    function renderRosterFilters() {
+      const stSel  = document.getElementById('roster-sport-type');
+      const divSel = document.getElementById('roster-division');
+
+      const stOptions = eventSts.length > 0
+        ? eventSts.map(s => s.sport_type)
+        : [...new Set(allRegs.map(r => r.sport_type))];
+
+      stSel.innerHTML = '<option value="">All sport types</option>' +
+        stOptions.map(st => `<option value="${st}">${escHtml(sportLabel(st))}</option>`).join('');
+
+      divSel.innerHTML = '<option value="">All divisions</option>' +
+        eventDivs.map(d => `<option value="${d.id}">${escHtml(divisionLabel(d))}</option>`).join('');
+    }
+
+    function onRosterFilterChange() {
+      const st              = document.getElementById('roster-sport-type').value;
+      const divId           = document.getElementById('roster-division').value;
+      const confirmedOnly   = document.getElementById('roster-confirmed-only').checked;
+
+      let filtered = allRegs;
+      if (st)            filtered = filtered.filter(r => r.sport_type === st);
+      if (divId)         filtered = filtered.filter(r => r.event_divisions?.id === divId);
+      if (confirmedOnly) filtered = filtered.filter(r => r.status === 'confirmed');
+
+      document.getElementById('roster-count').textContent = `${filtered.length} players`;
+
+      const lines = filtered.map(r => {
+        const name   = r.players?.name       || '?';
+        const team   = r.teams?.name         || '?';
+        const weight = r.event_divisions?.weight_category || '?';
+        const gender = r.event_divisions?.gender === 'girls' ? 'Girls'
+                     : r.event_divisions?.gender === 'mixed' ? 'Mixed' : 'Boys';
+        const ageMin = r.event_divisions?.age_min;
+        const ageMax = r.event_divisions?.age_max;
+        const age    = ageMin && ageMax ? `${ageMin}-${ageMax}` : ageMin ? `${ageMin}+` : 'Open';
+        return `${name} | ${team} | ${weight} | ${gender} | ${age}`;
+      });
+
+      document.getElementById('roster-preview').textContent =
+        lines.length > 0 ? lines.join('\n') : '(no players match current filters)';
+    }
+
+    async function copyRosterText() {
+      const text = document.getElementById('roster-preview').textContent;
+      await navigator.clipboard.writeText(text);
+      showToast('Roster text copied to clipboard!', 'success');
+    }
+
+    function printRoster() {
+      const st              = document.getElementById('roster-sport-type').value;
+      const divId           = document.getElementById('roster-division').value;
+      const confirmedOnly   = document.getElementById('roster-confirmed-only').checked;
+      const venueName       = document.getElementById('roster-venue-name').value.trim();
+
+      let filtered = allRegs;
+      if (st)            filtered = filtered.filter(r => r.sport_type === st);
+      if (divId)         filtered = filtered.filter(r => r.event_divisions?.id === divId);
+      if (confirmedOnly) filtered = filtered.filter(r => r.status === 'confirmed');
+
+      if (filtered.length === 0) {
+        showToast('No players to print.', 'error'); return;
+      }
+
+      const ev      = allEvents.find(e => e.id === currentEvId);
+      const stLabel = st ? sportLabel(st) : 'All Sport Types';
+      const divObj  = divId ? eventDivs.find(d => d.id === divId) : null;
+      const divLbl  = divObj ? divisionLabel(divObj) : 'All Divisions';
+
+      const rows = filtered.map(r => {
+        const name   = r.players?.name       || '?';
+        const team   = r.teams?.name         || '?';
+        const weight = r.event_divisions?.weight_category || '?';
+        const gender = r.event_divisions?.gender === 'girls' ? 'Girls'
+                     : r.event_divisions?.gender === 'mixed' ? 'Mixed' : 'Boys';
+        const ageMin = r.event_divisions?.age_min;
+        const ageMax = r.event_divisions?.age_max;
+        const age    = ageMin && ageMax ? `${ageMin}-${ageMax}` : ageMin ? `${ageMin}+` : 'Open';
+        const pipe   = `${name} | ${team} | ${weight} | ${gender} | ${age}`;
+        return { name, team, weight, gender, age, pipe };
+      });
+
+      const printArea = document.getElementById('print-area');
+      printArea.innerHTML = `
+        <div class="print-page">
+          <div class="print-header">
+            <div class="print-title">${escHtml(currentEvName)}</div>
+            <div class="print-meta">
+              ${venueName ? `Venue: ${escHtml(venueName)} &nbsp;|&nbsp; ` : ''}
+              Sport: ${escHtml(stLabel)} &nbsp;|&nbsp;
+              Division: ${escHtml(divLbl)} &nbsp;|&nbsp;
+              ${rows.length} player${rows.length!==1?'s':''}
+              &nbsp;|&nbsp; Printed: ${new Date().toLocaleDateString()}
+            </div>
+          </div>
+          <table class="print-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Name</th>
+                <th>Team</th>
+                <th>Weight Class</th>
+                <th>Division</th>
+                <th>Age Range</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows.map((r, i) => `
+                <tr>
+                  <td>${i+1}</td>
+                  <td>${escHtml(r.name)}</td>
+                  <td>${escHtml(r.team)}</td>
+                  <td>${escHtml(r.weight)}</td>
+                  <td>${escHtml(r.gender)}</td>
+                  <td>${escHtml(r.age)}</td>
+                </tr>`).join('')}
+            </tbody>
+          </table>
+          <div class="print-pipe-label">PIPE-DELIMITED FORMAT (paste into controls):</div>
+          <div class="print-pipe-block">${rows.map(r => escHtml(r.pipe)).join('\n')}</div>
+        </div>`;
+
+      window.print();
+    }
+
+    // Print roster for a specific venue (from Venues tab)
+    function generateVenueRoster(venueId) {
+      const venue = eventVenues.find(v => v.id === venueId);
+      if (!venue) return;
+      const assignments = venue.venue_assignments || [];
+      if (assignments.length === 0) {
+        showToast('No categories assigned to this venue.', 'error'); return;
+      }
+
+      const ev      = allEvents.find(e => e.id === currentEvId);
+      const printArea = document.getElementById('print-area');
+      let pages = '';
+
+      assignments.forEach(a => {
+        const divRegs = allRegs.filter(r =>
+          r.status === 'confirmed' &&
+          r.sport_type === a.sport_type &&
+          r.event_divisions?.id === a.event_divisions?.id
+        );
+        if (divRegs.length === 0) return;
+
+        const rows = divRegs.map(r => {
+          const name   = r.players?.name || '?';
+          const team   = r.teams?.name   || '?';
+          const weight = r.event_divisions?.weight_category || '?';
+          const gender = r.event_divisions?.gender === 'girls' ? 'Girls'
+                       : r.event_divisions?.gender === 'mixed' ? 'Mixed' : 'Boys';
+          const ageMin = r.event_divisions?.age_min;
+          const ageMax = r.event_divisions?.age_max;
+          const age    = ageMin && ageMax ? `${ageMin}-${ageMax}` : ageMin ? `${ageMin}+` : 'Open';
+          const pipe   = `${name} | ${team} | ${weight} | ${gender} | ${age}`;
+          return { name, team, weight, gender, age, pipe };
+        });
+
+        pages += `
+          <div class="print-page">
+            <div class="print-header">
+              <div class="print-title">${escHtml(currentEvName)}</div>
+              <div class="print-meta">
+                Venue: ${escHtml(venue.name)} &nbsp;|&nbsp;
+                Sport: ${escHtml(sportLabel(a.sport_type))} &nbsp;|&nbsp;
+                Division: ${a.event_divisions ? escHtml(divisionLabel(a.event_divisions)) : '—'} &nbsp;|&nbsp;
+                ${rows.length} player${rows.length!==1?'s':''}
+                &nbsp;|&nbsp; Printed: ${new Date().toLocaleDateString()}
+              </div>
+            </div>
+            <table class="print-table">
+              <thead><tr><th>#</th><th>Name</th><th>Team</th><th>Weight Class</th><th>Division</th><th>Age Range</th></tr></thead>
+              <tbody>
+                ${rows.map((r, i) => `
+                  <tr>
+                    <td>${i+1}</td>
+                    <td>${escHtml(r.name)}</td>
+                    <td>${escHtml(r.team)}</td>
+                    <td>${escHtml(r.weight)}</td>
+                    <td>${escHtml(r.gender)}</td>
+                    <td>${escHtml(r.age)}</td>
+                  </tr>`).join('')}
+              </tbody>
+            </table>
+            <div class="print-pipe-label">PIPE-DELIMITED FORMAT (paste into controls):</div>
+            <div class="print-pipe-block">${rows.map(r => escHtml(r.pipe)).join('\n')}</div>
+          </div>`;
+      });
+
+      if (!pages) { showToast('No confirmed players in any assigned category.', 'error'); return; }
+      printArea.innerHTML = pages;
+      window.print();
+    }
+
+    init();
+  </script>
+</body>
+</html>

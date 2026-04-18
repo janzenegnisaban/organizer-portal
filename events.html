@@ -6,16 +6,73 @@
   <title>Events — KaliArena Organizer</title>
   <link rel="icon" href="logo.png">
   <link rel="stylesheet" href="css/app.css">
+  <style>
+    .st-item { border:1px solid var(--border); border-radius:.625rem; margin-bottom:.5rem; overflow:hidden; }
+    .st-item-header {
+      display:flex; align-items:center; gap:.625rem; padding:.625rem .75rem;
+      background:var(--muted); cursor:default;
+    }
+    .st-item-header input[type=checkbox] { width:1rem; height:1rem; accent-color:var(--primary); flex-shrink:0; cursor:pointer; }
+    .st-item-header label { font-size:.875rem; font-weight:500; cursor:pointer; flex:1; }
+    .st-rules { padding:.75rem; display:none; border-top:1px solid var(--border); background:var(--background); }
+    .st-rules.visible { display:block; }
+    .st-rules .form-row { margin-bottom:0; }
+    .st-rules .form-group { margin-bottom:.625rem; }
+
+    .sport-chip {
+      display:inline-flex; align-items:center; gap:.3rem;
+      padding:.2rem .55rem; border-radius:9999px; font-size:.7rem; font-weight:600;
+      white-space:nowrap;
+    }
+    .sport-anyo-trad    { background:#ede9fe; color:#6d28d9; }
+    .sport-anyo-nontrad { background:#dbeafe; color:#1d4ed8; }
+    .sport-fc-padded    { background:#fef3c7; color:#92400e; }
+    .sport-fc-live      { background:#fee2e2; color:#991b1b; }
+
+    .bracket-quick-add {
+      background:var(--muted);
+      border:1px solid var(--border);
+      border-radius:.625rem;
+      padding:.875rem;
+      margin-bottom:.75rem;
+    }
+    .wt-grid { display:grid; grid-template-columns:1fr 1fr; gap:.3125rem .75rem; }
+    .wt-item { display:flex; align-items:flex-start; gap:.375rem; font-size:.8125rem; cursor:pointer; line-height:1.4; }
+    .wt-item input { accent-color:var(--primary); flex-shrink:0; cursor:pointer; margin-top:.2rem; }
+    .wt-desc { font-size:.6875rem; color:var(--muted-foreground); }
+    .age-pill {
+      display:inline-flex; align-items:center; gap:.3rem;
+      padding:.25rem .625rem; border-radius:9999px;
+      border:1px solid var(--border);
+      font-size:.8rem; cursor:pointer; background:var(--background);
+    }
+    .age-pill input { accent-color:var(--primary); cursor:pointer; }
+    .gender-pill {
+      display:inline-flex; align-items:center; gap:.3rem;
+      padding:.25rem .625rem; border-radius:9999px;
+      border:1px solid var(--border);
+      font-size:.8rem; cursor:pointer; background:var(--background);
+    }
+    .gender-pill input { accent-color:var(--primary); cursor:pointer; }
+    .st-radio-pill {
+      display:inline-flex; align-items:center; gap:.375rem;
+      padding:.25rem .625rem; border-radius:9999px;
+      border:1px solid var(--border);
+      font-size:.8rem; cursor:pointer; background:var(--background);
+    }
+    .st-radio-pill input { accent-color:var(--primary); cursor:pointer; }
+  </style>
 </head>
 <body>
   <div class="loading-overlay" id="loading-overlay"><div class="spinner"></div></div>
 
   <!-- Create Event Dialog -->
   <div class="dialog-overlay hidden" id="event-dialog">
-    <div class="dialog" style="max-width:36rem;">
+    <div class="dialog" style="max-width:44rem;">
       <div class="dialog-title" id="event-dialog-title">Create Event</div>
-      <form id="event-form">
+      <form id="event-form" style="max-height:82vh;overflow-y:auto;padding-right:.25rem;">
         <input type="hidden" id="event-id">
+
         <div class="form-group">
           <label class="form-label">Event Name *</label>
           <input type="text" id="ev-name" class="form-input" placeholder="e.g. Regional Arnis Championship 2026" required>
@@ -41,7 +98,7 @@
           </div>
           <div class="form-group">
             <label class="form-label">Competition Type</label>
-            <input type="text" id="ev-type" class="form-input" placeholder="e.g. Single Stick, Doble Baston">
+            <input type="text" id="ev-type" class="form-input" placeholder="e.g. Arnis Championship">
           </div>
         </div>
         <div class="form-row">
@@ -54,6 +111,190 @@
             <input type="date" id="ev-deadline" class="form-input">
           </div>
         </div>
+
+        <!-- Sport Types & Rules -->
+        <div style="border-top:1px solid var(--border);margin:.875rem 0 .875rem;padding-top:1rem;">
+          <label class="form-label" style="margin-bottom:.5rem;">Sport Types &amp; Rules</label>
+          <p style="font-size:.75rem;color:var(--muted-foreground);margin-bottom:.75rem;">
+            Select which formats this event includes. Each type can have its own rules. Brackets below are linked to these sport types.
+          </p>
+
+          <div class="st-item">
+            <div class="st-item-header">
+              <input type="checkbox" id="st-anyo-traditional" onchange="toggleSportType('anyo-traditional', this.checked)">
+              <label for="st-anyo-traditional"><i data-lucide="star" style="width:.875rem;height:.875rem;display:inline;vertical-align:middle;margin-right:.25rem;"></i> Anyo — Traditional</label>
+            </div>
+            <div class="st-rules" id="rules-anyo-traditional">
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label" style="font-size:.8125rem;">Performance Time (seconds)</label>
+                  <input type="number" class="form-input" id="st-at-perf-sec" value="180" min="30" max="600">
+                </div>
+                <div class="form-group">
+                  <label class="form-label" style="font-size:.8125rem;">Number of Judges</label>
+                  <input type="number" class="form-input" id="st-at-judges" value="5" min="1" max="9">
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label" style="font-size:.8125rem;">Weapon Category</label>
+                <select class="form-select" id="st-at-weapon">
+                  <option value="single-stick">Single Stick</option>
+                  <option value="double-stick">Double Stick</option>
+                  <option value="espada-y-daga">Espada y Daga</option>
+                  <option value="mixed">Mixed</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="st-item">
+            <div class="st-item-header">
+              <input type="checkbox" id="st-anyo-non-traditional" onchange="toggleSportType('anyo-non-traditional', this.checked)">
+              <label for="st-anyo-non-traditional"><i data-lucide="zap" style="width:.875rem;height:.875rem;display:inline;vertical-align:middle;margin-right:.25rem;"></i> Anyo — Non-Traditional</label>
+            </div>
+            <div class="st-rules" id="rules-anyo-non-traditional">
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label" style="font-size:.8125rem;">Performance Time (seconds)</label>
+                  <input type="number" class="form-input" id="st-ant-perf-sec" value="180" min="30" max="600">
+                </div>
+                <div class="form-group">
+                  <label class="form-label" style="font-size:.8125rem;">Number of Judges</label>
+                  <input type="number" class="form-input" id="st-ant-judges" value="5" min="1" max="9">
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label" style="font-size:.8125rem;">Weapon Category</label>
+                <select class="form-select" id="st-ant-weapon">
+                  <option value="single-stick">Single Stick</option>
+                  <option value="double-stick">Double Stick</option>
+                  <option value="espada-y-daga">Espada y Daga</option>
+                  <option value="mixed">Mixed</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="st-item">
+            <div class="st-item-header">
+              <input type="checkbox" id="st-full-contact-padded" onchange="toggleSportType('full-contact-padded', this.checked)">
+              <label for="st-full-contact-padded"><i data-lucide="shield" style="width:.875rem;height:.875rem;display:inline;vertical-align:middle;margin-right:.25rem;"></i> Full Contact — Padded</label>
+            </div>
+            <div class="st-rules" id="rules-full-contact-padded">
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label" style="font-size:.8125rem;">Number of Rounds</label>
+                  <input type="number" class="form-input" id="st-fcp-rounds" value="3" min="1" max="5">
+                </div>
+                <div class="form-group">
+                  <label class="form-label" style="font-size:.8125rem;">Round Duration (seconds)</label>
+                  <input type="number" class="form-input" id="st-fcp-duration" value="60" min="30" max="300">
+                </div>
+                <div class="form-group">
+                  <label class="form-label" style="font-size:.8125rem;">Violation Cap</label>
+                  <input type="number" class="form-input" id="st-fcp-violation" value="3" min="1" max="5">
+                </div>
+              </div>
+              <div style="display:flex;gap:1.25rem;margin-top:.25rem;">
+                <label style="display:flex;align-items:center;gap:.5rem;font-size:.8125rem;cursor:pointer;">
+                  <input type="checkbox" id="st-fcp-adv" checked style="width:.875rem;height:.875rem;accent-color:var(--primary);"> Track Advantages
+                </label>
+                <label style="display:flex;align-items:center;gap:.5rem;font-size:.8125rem;cursor:pointer;">
+                  <input type="checkbox" id="st-fcp-dis" style="width:.875rem;height:.875rem;accent-color:var(--primary);"> Track Disarms
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="st-item">
+            <div class="st-item-header">
+              <input type="checkbox" id="st-full-contact-livestick" onchange="toggleSportType('full-contact-livestick', this.checked)">
+              <label for="st-full-contact-livestick"><i data-lucide="swords" style="width:.875rem;height:.875rem;display:inline;vertical-align:middle;margin-right:.25rem;"></i> Full Contact — Live Stick</label>
+            </div>
+            <div class="st-rules" id="rules-full-contact-livestick">
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label" style="font-size:.8125rem;">Number of Rounds</label>
+                  <input type="number" class="form-input" id="st-fcl-rounds" value="3" min="1" max="5">
+                </div>
+                <div class="form-group">
+                  <label class="form-label" style="font-size:.8125rem;">Round Duration (seconds)</label>
+                  <input type="number" class="form-input" id="st-fcl-duration" value="60" min="30" max="300">
+                </div>
+                <div class="form-group">
+                  <label class="form-label" style="font-size:.8125rem;">Violation Cap</label>
+                  <input type="number" class="form-input" id="st-fcl-violation" value="3" min="1" max="5">
+                </div>
+              </div>
+              <div style="display:flex;gap:1.25rem;margin-top:.25rem;">
+                <label style="display:flex;align-items:center;gap:.5rem;font-size:.8125rem;cursor:pointer;">
+                  <input type="checkbox" id="st-fcl-adv" checked style="width:.875rem;height:.875rem;accent-color:var(--primary);"> Track Advantages
+                </label>
+                <label style="display:flex;align-items:center;gap:.5rem;font-size:.8125rem;cursor:pointer;">
+                  <input type="checkbox" id="st-fcl-dis" style="width:.875rem;height:.875rem;accent-color:var(--primary);"> Track Disarms
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Competition Brackets -->
+        <div style="border-top:1px solid var(--border);margin:.875rem 0 .875rem;padding-top:1rem;">
+          <div style="display:flex;align-items:center;gap:.625rem;margin-bottom:.375rem;">
+            <label class="form-label" style="margin:0;">Competition Brackets</label>
+            <span id="bracket-count-badge" class="badge badge-primary">0 brackets</span>
+          </div>
+          <p style="font-size:.75rem;color:var(--muted-foreground);margin-bottom:.75rem;">
+            Each bracket (sport type + weight class + age group + gender) is independent with its own Gold / Silver / Bronze awards.
+          </p>
+
+          <!-- Quick Add Panel -->
+          <div class="bracket-quick-add">
+            <div style="font-size:.8125rem;font-weight:600;margin-bottom:.75rem;">Quick Add</div>
+
+            <div class="form-group" style="margin-bottom:.625rem;">
+              <label class="form-label" style="font-size:.75rem;">Sport Type</label>
+              <div id="qa-sport-btns" style="display:flex;gap:.375rem;flex-wrap:wrap;">
+                <span style="font-size:.8rem;color:var(--muted-foreground);font-style:italic;">Enable a sport type above first.</span>
+              </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom:.625rem;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.375rem;">
+                <label class="form-label" style="font-size:.75rem;margin:0;">Weight Classes</label>
+                <button type="button" id="toggle-all-wt-btn" onclick="toggleAllWeights()"
+                  style="font-size:.7rem;color:var(--primary);background:none;border:none;cursor:pointer;padding:0;text-decoration:underline;">
+                  Select All
+                </button>
+              </div>
+              <div class="wt-grid" id="qa-weights"></div>
+            </div>
+
+            <div class="form-group" style="margin-bottom:.625rem;">
+              <label class="form-label" style="font-size:.75rem;">Age Groups</label>
+              <div style="display:flex;gap:.375rem;flex-wrap:wrap;" id="qa-ages"></div>
+            </div>
+
+            <div class="form-group" style="margin-bottom:.75rem;">
+              <label class="form-label" style="font-size:.75rem;">Gender</label>
+              <div style="display:flex;gap:.375rem;flex-wrap:wrap;">
+                <label class="gender-pill"><input type="checkbox" id="qa-boys" checked> Boys</label>
+                <label class="gender-pill"><input type="checkbox" id="qa-girls" checked> Girls</label>
+                <label class="gender-pill"><input type="checkbox" id="qa-mixed"> Mixed</label>
+              </div>
+            </div>
+
+            <button type="button" class="btn btn-primary btn-sm" onclick="quickAddBrackets()">
+              <i data-lucide="plus"></i> Add Brackets
+            </button>
+          </div>
+
+          <!-- Bracket List -->
+          <div id="brackets-list">
+            <p style="font-size:.8125rem;color:var(--muted-foreground);">No brackets yet. Use Quick Add above.</p>
+          </div>
+        </div>
+
         <div class="form-group" style="margin-bottom:1.25rem;">
           <label style="display:flex;align-items:center;gap:.625rem;font-size:.875rem;cursor:pointer;">
             <input type="checkbox" id="ev-public" style="width:1rem;height:1rem;accent-color:var(--primary);" checked>
@@ -62,7 +303,7 @@
         </div>
         <div class="alert alert-info" style="margin-bottom:1.25rem;font-size:.8125rem;">
           <i data-lucide="info" style="width:.875rem;height:.875rem;flex-shrink:0;"></i>
-          New events require admin approval before coaches can see and join them.
+          New events require admin approval before coaches can register players.
         </div>
         <div class="dialog-footer">
           <button type="button" class="btn btn-secondary" onclick="closeDialog('event-dialog')">Cancel</button>
@@ -93,7 +334,7 @@
           <div class="page-header">
             <div class="page-header-text">
               <h1 class="page-title">My Events</h1>
-              <p class="page-subtitle">Create and manage your competitions. New events require admin approval before coaches can see them.</p>
+              <p class="page-subtitle">Create and manage your competitions. New events require admin approval before coaches can register players.</p>
             </div>
             <button class="btn btn-primary" onclick="openCreateDialog()"><i data-lucide="plus"></i> Create Event</button>
           </div>
@@ -119,7 +360,43 @@
     const PAGE = 'events.html';
     let orgId;
     let allEvents = [];
+    let eventBrackets = []; // {sport_type, weight_category, weight_desc, age_key, age_min, age_max, gender}
+    let allWtSelected = false;
+    const selectedSportTypes = new Set();
 
+    const WEIGHT_CLASSES = [
+      { label: 'Mini Flyweight',    desc: 'Up to 46 kg' },
+      { label: 'Flyweight',         desc: '46.1 – 50 kg' },
+      { label: 'Bantamweight',      desc: '50.1 – 54 kg' },
+      { label: 'Featherweight',     desc: '54.1 – 57 kg' },
+      { label: 'Lightweight',       desc: '57.1 – 61 kg' },
+      { label: 'Welterweight',      desc: '61.1 – 67 kg' },
+      { label: 'Middleweight',      desc: '67.1 – 74 kg' },
+      { label: 'Light Heavyweight', desc: '74.1 – 82 kg' },
+      { label: 'Heavyweight',       desc: '82.1 kg and above' },
+    ];
+
+    const AGE_GROUPS = [
+      { key: '10-12', label: '10–12 yrs', min: 10, max: 12 },
+      { key: '12-15', label: '12–15 yrs', min: 12, max: 15 },
+      { key: '16-18', label: '16–18 yrs', min: 16, max: 18 },
+      { key: 'open',  label: 'Open (18+)', min: 18, max: null },
+    ];
+
+    const SPORT_CHIPS = {
+      'anyo-traditional':      'sport-anyo-trad',
+      'anyo-non-traditional':  'sport-anyo-nontrad',
+      'full-contact-padded':   'sport-fc-padded',
+      'full-contact-livestick':'sport-fc-live',
+    };
+    const SPORT_LABELS = {
+      'anyo-traditional':      'Anyo — Traditional',
+      'anyo-non-traditional':  'Anyo — Non-Traditional',
+      'full-contact-padded':   'FC Padded',
+      'full-contact-livestick':'FC Live Stick',
+    };
+
+    // ── Init ──────────────────────────────────────────────────────
     async function init() {
       const ctx = await requireRole();
       if (!ctx) return;
@@ -131,10 +408,16 @@
       refreshIcons();
     }
 
+    // ── Load Events ───────────────────────────────────────────────
     async function loadEvents() {
-      const { data, error } = await window.db
+      const { data } = await window.db
         .from('competitions')
-        .select('*, competition_registrations(id)')
+        .select(`
+          *,
+          event_divisions(id),
+          event_sport_types(id, sport_type),
+          event_player_registrations(id, status)
+        `)
         .eq('organizer_id', orgId)
         .order('created_at', { ascending: false });
 
@@ -147,15 +430,21 @@
             <i data-lucide="calendar-days"></i>
             <h3>No events yet</h3>
             <p>Create your first competition to get started.</p>
-            <button class="btn btn-primary btn-sm" style="margin-top:.875rem;" onclick="openCreateDialog()"><i data-lucide="plus"></i> Create Event</button>
+            <button class="btn btn-primary btn-sm" style="margin-top:.875rem;" onclick="openCreateDialog()">
+              <i data-lucide="plus"></i> Create Event
+            </button>
           </div>`;
         refreshIcons(); return;
       }
 
       container.innerHTML = `<div style="display:flex;flex-direction:column;gap:.875rem;">` +
         allEvents.map(ev => {
-          const approval = ev.admin_approval_status || 'pending';
-          const regCount = ev.competition_registrations?.length || 0;
+          const approval  = ev.admin_approval_status || 'pending';
+          const brackets  = ev.event_divisions || [];
+          const sts       = ev.event_sport_types || [];
+          const regs      = ev.event_player_registrations || [];
+          const pending   = regs.filter(r => r.status === 'pending').length;
+          const confirmed = regs.filter(r => r.status === 'confirmed').length;
           return `
             <div class="card">
               <div class="card-content" style="padding:1.125rem;">
@@ -169,36 +458,268 @@
                     ${ev.description ? `<p class="text-sm text-muted mt-1">${escHtml(ev.description)}</p>` : ''}
                     <div class="flex gap-4 text-xs text-muted mt-2 flex-wrap">
                       ${ev.location ? `<span><i data-lucide="map-pin" style="width:.75rem;height:.75rem;display:inline;vertical-align:middle;"></i> ${escHtml(ev.location)}</span>` : ''}
-                      <span><i data-lucide="calendar" style="width:.75rem;height:.75rem;display:inline;vertical-align:middle;"></i> ${formatDate(ev.start_date)}${ev.end_date ? ' – ' + formatDate(ev.end_date) : ''}</span>
-                      <span><i data-lucide="users" style="width:.75rem;height:.75rem;display:inline;vertical-align:middle;"></i> ${regCount} registered</span>
+                      <span><i data-lucide="calendar" style="width:.75rem;height:.75rem;display:inline;vertical-align:middle;"></i> ${formatDate(ev.start_date)}${ev.end_date ? ' – '+formatDate(ev.end_date) : ''}</span>
+                      <span><i data-lucide="users" style="width:.75rem;height:.75rem;display:inline;vertical-align:middle;"></i>
+                        ${confirmed} confirmed · ${pending} pending
+                      </span>
+                      ${brackets.length > 0 ? `<span><i data-lucide="grid-3x3" style="width:.75rem;height:.75rem;display:inline;vertical-align:middle;"></i> ${brackets.length} bracket${brackets.length !== 1 ? 's' : ''}</span>` : ''}
                     </div>
+                    ${sts.length > 0 ? `
+                      <div class="flex gap-1 flex-wrap mt-2">
+                        ${sts.map(s => `<span class="sport-chip ${SPORT_CHIPS[s.sport_type]||''}">${escHtml(SPORT_LABELS[s.sport_type]||s.sport_type)}</span>`).join('')}
+                      </div>` : ''}
                     ${approval === 'rejected' && ev.rejection_reason ? `
                       <div class="alert alert-error" style="margin-top:.75rem;font-size:.8125rem;padding:.625rem .75rem;">
                         <i data-lucide="x-circle" style="width:.875rem;height:.875rem;flex-shrink:0;"></i>
                         Rejection reason: ${escHtml(ev.rejection_reason)}
-                      </div>
-                    ` : ''}
+                      </div>` : ''}
                   </div>
-                  <div class="flex gap-2">
-                    <button class="btn btn-secondary btn-sm" onclick="deleteEvent('${ev.id}', '${escHtml(ev.name)}')" title="Delete">
+                  <div class="flex gap-2 flex-wrap" style="flex-shrink:0;">
+                    ${approval === 'approved' ? `
+                      <a href="brackets.html?ev=${ev.id}" class="btn btn-secondary btn-sm">
+                        <i data-lucide="list-checks"></i> Registrations
+                      </a>` : ''}
+                    <button class="btn btn-secondary btn-sm" onclick="deleteEvent('${ev.id}','${escHtml(ev.name).replace(/'/g,"\\'")}')">
                       <i data-lucide="trash-2"></i>
                     </button>
                   </div>
                 </div>
               </div>
-            </div>
-          `;
+            </div>`;
         }).join('') + `</div>`;
 
       refreshIcons();
     }
 
+    // ── Sport Type Toggle ─────────────────────────────────────────
+    function toggleSportType(type, checked) {
+      const rulesEl = document.getElementById('rules-' + type);
+      if (checked) {
+        selectedSportTypes.add(type);
+        rulesEl?.classList.add('visible');
+      } else {
+        selectedSportTypes.delete(type);
+        rulesEl?.classList.remove('visible');
+        // Remove brackets of this type
+        eventBrackets = eventBrackets.filter(b => b.sport_type !== type);
+        renderBrackets();
+      }
+      renderQuickAddSportTypes();
+    }
+
+    function readSportTypeRules(type) {
+      if (type === 'anyo-traditional') return {
+        performance_sec:  +document.getElementById('st-at-perf-sec').value  || 180,
+        num_judges:       +document.getElementById('st-at-judges').value     || 5,
+        weapon_category:   document.getElementById('st-at-weapon').value     || 'single-stick',
+      };
+      if (type === 'anyo-non-traditional') return {
+        performance_sec:  +document.getElementById('st-ant-perf-sec').value  || 180,
+        num_judges:       +document.getElementById('st-ant-judges').value     || 5,
+        weapon_category:   document.getElementById('st-ant-weapon').value     || 'single-stick',
+      };
+      if (type === 'full-contact-padded') return {
+        num_rounds:        +document.getElementById('st-fcp-rounds').value    || 3,
+        round_duration_sec:+document.getElementById('st-fcp-duration').value  || 60,
+        violation_cap:     +document.getElementById('st-fcp-violation').value || 3,
+        track_advantages:   document.getElementById('st-fcp-adv').checked,
+        track_disarms:      document.getElementById('st-fcp-dis').checked,
+      };
+      if (type === 'full-contact-livestick') return {
+        num_rounds:        +document.getElementById('st-fcl-rounds').value    || 3,
+        round_duration_sec:+document.getElementById('st-fcl-duration').value  || 60,
+        violation_cap:     +document.getElementById('st-fcl-violation').value || 3,
+        track_advantages:   document.getElementById('st-fcl-adv').checked,
+        track_disarms:      document.getElementById('st-fcl-dis').checked,
+      };
+      return {};
+    }
+
+    function resetSportTypes() {
+      selectedSportTypes.clear();
+      ['anyo-traditional','anyo-non-traditional','full-contact-padded','full-contact-livestick'].forEach(t => {
+        const cb = document.getElementById('st-' + t);
+        if (cb) cb.checked = false;
+        document.getElementById('rules-' + t)?.classList.remove('visible');
+      });
+    }
+
+    // ── Bracket Builder ───────────────────────────────────────────
+    function renderWeightChecklist() {
+      document.getElementById('qa-weights').innerHTML = WEIGHT_CLASSES.map(w => `
+        <label class="wt-item">
+          <input type="checkbox" class="qa-wt" value="${escHtml(w.label)}" data-desc="${escHtml(w.desc)}">
+          <span>${escHtml(w.label)} <span class="wt-desc">${escHtml(w.desc)}</span></span>
+        </label>
+      `).join('');
+    }
+
+    function renderAgeGroupPills() {
+      document.getElementById('qa-ages').innerHTML = AGE_GROUPS.map(ag => `
+        <label class="age-pill">
+          <input type="checkbox" class="qa-age" value="${ag.key}"
+            data-min="${ag.min ?? ''}" data-max="${ag.max ?? ''}">
+          ${escHtml(ag.label)}
+        </label>
+      `).join('');
+    }
+
+    function renderQuickAddSportTypes() {
+      const el = document.getElementById('qa-sport-btns');
+      if (!el) return;
+      const types = [...selectedSportTypes];
+      if (types.length === 0) {
+        el.innerHTML = `<span style="font-size:.8rem;color:var(--muted-foreground);font-style:italic;">Enable a sport type above first.</span>`;
+        return;
+      }
+      el.innerHTML = types.map((t, i) => `
+        <label class="st-radio-pill">
+          <input type="radio" name="qa-sport-type" value="${t}" ${i === 0 ? 'checked' : ''}>
+          <span class="sport-chip ${SPORT_CHIPS[t]||''}" style="padding:0 .125rem;">${escHtml(SPORT_LABELS[t]||t)}</span>
+        </label>
+      `).join('');
+    }
+
+    function toggleAllWeights() {
+      allWtSelected = !allWtSelected;
+      document.querySelectorAll('.qa-wt').forEach(cb => cb.checked = allWtSelected);
+      document.getElementById('toggle-all-wt-btn').textContent = allWtSelected ? 'Deselect All' : 'Select All';
+    }
+
+    function quickAddBrackets() {
+      const stEl = document.querySelector('input[name="qa-sport-type"]:checked');
+      if (!stEl) { showToast('Enable and select a sport type first.', 'warning'); return; }
+      const sportType = stEl.value;
+
+      const weights = [...document.querySelectorAll('.qa-wt:checked')].map(cb => ({
+        label: cb.value, desc: cb.dataset.desc,
+      }));
+      if (!weights.length) { showToast('Select at least one weight class.', 'warning'); return; }
+
+      const ages = [...document.querySelectorAll('.qa-age:checked')].map(cb => ({
+        key: cb.value,
+        min: cb.dataset.min !== '' ? +cb.dataset.min : null,
+        max: cb.dataset.max !== '' ? +cb.dataset.max : null,
+      }));
+      if (!ages.length) { showToast('Select at least one age group.', 'warning'); return; }
+
+      const genders = [];
+      if (document.getElementById('qa-boys').checked)  genders.push('boys');
+      if (document.getElementById('qa-girls').checked) genders.push('girls');
+      if (document.getElementById('qa-mixed').checked) genders.push('mixed');
+      if (!genders.length) { showToast('Select at least one gender.', 'warning'); return; }
+
+      let added = 0;
+      for (const w of weights) {
+        for (const ag of ages) {
+          for (const g of genders) {
+            const dupKey = `${sportType}||${w.label}||${ag.key}||${g}`;
+            const dup = eventBrackets.some(b =>
+              `${b.sport_type}||${b.weight_category}||${b.age_key}||${b.gender}` === dupKey
+            );
+            if (!dup) {
+              eventBrackets.push({
+                sport_type:      sportType,
+                weight_category: w.label,
+                weight_desc:     w.desc,
+                age_key:         ag.key,
+                age_min:         ag.min,
+                age_max:         ag.max,
+                gender:          g,
+              });
+              added++;
+            }
+          }
+        }
+      }
+
+      if (added > 0) {
+        showToast(`${added} bracket${added !== 1 ? 's' : ''} added.`, 'success');
+      } else {
+        showToast('All selected combinations already exist.', 'info');
+      }
+      renderBrackets();
+    }
+
+    function removeBracket(i) {
+      eventBrackets.splice(i, 1);
+      renderBrackets();
+    }
+
+    function renderBrackets() {
+      const el    = document.getElementById('brackets-list');
+      const badge = document.getElementById('bracket-count-badge');
+      if (badge) badge.textContent = `${eventBrackets.length} bracket${eventBrackets.length !== 1 ? 's' : ''}`;
+      if (!el) return;
+
+      if (eventBrackets.length === 0) {
+        el.innerHTML = `<p style="font-size:.8125rem;color:var(--muted-foreground);">No brackets yet. Use Quick Add above.</p>`;
+        return;
+      }
+
+      // Group by sport type
+      const groups = {};
+      eventBrackets.forEach((b, i) => {
+        if (!groups[b.sport_type]) groups[b.sport_type] = [];
+        groups[b.sport_type].push({ ...b, _idx: i });
+      });
+
+      el.innerHTML = Object.entries(groups).map(([st, bArr]) => `
+        <div style="margin-bottom:.75rem;">
+          <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.375rem;">
+            <span class="sport-chip ${SPORT_CHIPS[st]||''}">${escHtml(SPORT_LABELS[st]||st)}</span>
+            <span class="text-xs text-muted">${bArr.length} bracket${bArr.length !== 1 ? 's' : ''}</span>
+          </div>
+          <div style="overflow-x:auto;border:1px solid var(--border);border-radius:.5rem;max-height:11rem;overflow-y:auto;">
+            <table style="width:100%;border-collapse:collapse;font-size:.8125rem;">
+              <thead>
+                <tr style="background:var(--muted);position:sticky;top:0;z-index:1;">
+                  <th style="padding:.3125rem .625rem;text-align:left;white-space:nowrap;">Weight Class</th>
+                  <th style="padding:.3125rem .625rem;text-align:left;color:var(--muted-foreground);font-weight:400;">Range</th>
+                  <th style="padding:.3125rem .625rem;text-align:left;white-space:nowrap;">Age Group</th>
+                  <th style="padding:.3125rem .625rem;text-align:left;">Gender</th>
+                  <th style="padding:.3125rem .5rem;width:2rem;"></th>
+                </tr>
+              </thead>
+              <tbody>
+                ${bArr.map(b => `
+                  <tr style="border-bottom:1px solid var(--border);">
+                    <td style="padding:.3125rem .625rem;font-weight:500;white-space:nowrap;">${escHtml(b.weight_category)}</td>
+                    <td style="padding:.3125rem .625rem;color:var(--muted-foreground);white-space:nowrap;">${escHtml(b.weight_desc||'')}</td>
+                    <td style="padding:.3125rem .625rem;white-space:nowrap;">${escHtml(b.age_key === 'open' ? 'Open (18+)' : (b.age_min + '–' + b.age_max + ' yrs'))}</td>
+                    <td style="padding:.3125rem .625rem;text-transform:capitalize;">${escHtml(b.gender)}</td>
+                    <td style="padding:.3125rem .5rem;">
+                      <button type="button" onclick="removeBracket(${b._idx})"
+                        style="background:none;border:none;cursor:pointer;color:#dc2626;display:flex;align-items:center;padding:.125rem;">
+                        <i data-lucide="x" style="width:.875rem;height:.875rem;"></i>
+                      </button>
+                    </td>
+                  </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `).join('');
+      refreshIcons();
+    }
+
+    // ── Dialog ────────────────────────────────────────────────────
     function openCreateDialog() {
       document.getElementById('event-dialog-title').textContent = 'Create Event';
       document.getElementById('event-id').value = '';
       document.getElementById('event-form').reset();
       document.getElementById('ev-public').checked = true;
+      eventBrackets = [];
+      allWtSelected = false;
+      resetSportTypes();
+      renderWeightChecklist();
+      renderAgeGroupPills();
+      renderQuickAddSportTypes();
+      renderBrackets();
+      const btn = document.getElementById('toggle-all-wt-btn');
+      if (btn) btn.textContent = 'Select All';
       openDialog('event-dialog');
+      refreshIcons();
     }
 
     async function deleteEvent(id, name) {
@@ -209,6 +730,7 @@
       loadEvents();
     }
 
+    // ── Submit ────────────────────────────────────────────────────
     document.getElementById('event-form').addEventListener('submit', async e => {
       e.preventDefault();
       const btn = document.getElementById('event-submit');
@@ -218,21 +740,61 @@
         name:                  document.getElementById('ev-name').value,
         description:           document.getElementById('ev-desc').value || null,
         start_date:            document.getElementById('ev-start').value || null,
-        end_date:              document.getElementById('ev-end').value || null,
+        end_date:              document.getElementById('ev-end').value   || null,
         location:              document.getElementById('ev-location').value || null,
-        competition_type:      document.getElementById('ev-type').value || null,
+        competition_type:      document.getElementById('ev-type').value  || null,
         max_teams:             parseInt(document.getElementById('ev-maxteams').value) || null,
         registration_deadline: document.getElementById('ev-deadline').value || null,
         is_public:             document.getElementById('ev-public').checked,
         organizer_id:          orgId,
-        status:               'upcoming',
+        status:                'upcoming',
         admin_approval_status: 'pending',
       };
 
-      const { error } = await window.db.from('competitions').insert(payload);
-      btn.disabled = false; btn.textContent = 'Create Event';
+      const { data: evData, error } = await window.db
+        .from('competitions').insert(payload).select('id').single();
+      if (error) {
+        showToast(error.message || 'Failed to create event.', 'error');
+        btn.disabled = false; btn.textContent = 'Create Event';
+        return;
+      }
 
-      if (error) { showToast(error.message || 'Failed to create event.', 'error'); return; }
+      const evId = evData.id;
+      const promises = [];
+
+      // Save brackets as event_divisions rows (each bracket = one division row with sport_type)
+      if (eventBrackets.length > 0) {
+        promises.push(
+          window.db.from('event_divisions').insert(
+            eventBrackets.map(b => ({
+              competition_id:  evId,
+              sport_type:      b.sport_type,
+              weight_category: b.weight_category,
+              weight_desc:     b.weight_desc || null,
+              gender:          b.gender,
+              age_min:         b.age_min  ?? null,
+              age_max:         b.age_max  ?? null,
+            }))
+          )
+        );
+      }
+
+      // Save sport type rules
+      if (selectedSportTypes.size > 0) {
+        const stRows = [...selectedSportTypes].map(t => ({
+          competition_id: evId,
+          sport_type:     t,
+          rules_json:     readSportTypeRules(t),
+        }));
+        promises.push(window.db.from('event_sport_types').insert(stRows));
+      }
+
+      const results = await Promise.all(promises);
+      results.forEach(r => {
+        if (r.error) showToast('Warning: ' + r.error.message, 'warning');
+      });
+
+      btn.disabled = false; btn.textContent = 'Create Event';
       showToast('Event created! Awaiting admin approval.', 'success');
       closeDialog('event-dialog');
       loadEvents();

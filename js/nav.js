@@ -2,17 +2,20 @@
 // KaliArena — Navigation  |  ORGANIZER PORTAL
 // ============================================================
 const NAV_ITEMS = [
-  { label: 'Dashboard',          page: 'dashboard.html',     icon: 'layout-dashboard' },
-  { label: 'Events',             page: 'events.html',        icon: 'calendar-days' },
-  { label: 'Match Notifications',page: 'notifications.html', icon: 'bell' },
-  { label: 'Teams',              page: 'teams.html',         icon: 'users' },
+  { label: 'Dashboard',           page: 'dashboard.html',     icon: 'layout-dashboard' },
+  { label: 'Events',              page: 'events.html',        icon: 'calendar-days' },
+  { label: 'Registrations',       page: 'brackets.html',      icon: 'list-checks' },
+  { label: 'Results',             page: 'results.html',       icon: 'trophy' },
+  { label: 'Match Notifications', page: 'notifications.html', icon: 'bell' },
+  { label: 'Teams',               page: 'teams.html',         icon: 'users' },
 ];
 
 const MOBILE_NAV = [
   { label: 'Home',    page: 'dashboard.html',     icon: 'layout-dashboard' },
   { label: 'Events',  page: 'events.html',        icon: 'calendar-days' },
+  { label: 'Regs',    page: 'brackets.html',      icon: 'list-checks' },
+  { label: 'Results', page: 'results.html',       icon: 'trophy' },
   { label: 'Notify',  page: 'notifications.html', icon: 'bell' },
-  { label: 'Teams',   page: 'teams.html',         icon: 'users' },
 ];
 
 const ROLE_BADGE = `<span class="badge badge-emerald"><i data-lucide="settings" style="width:.75rem;height:.75rem;"></i> Organizer</span>`;
@@ -27,7 +30,7 @@ function renderNav(currentPage) {
         <i data-lucide="${n.icon}"></i>${escHtml(n.label)}
       </a>
     `).join('') +
-    `<button onclick="signOut()" class="sidebar-nav-link" style="margin-top:.5rem;">
+    `<button onclick="showSignOutModal()" class="sidebar-nav-link" style="margin-top:.5rem;">
       <i data-lucide="log-out"></i>Sign out
     </button>`;
   }

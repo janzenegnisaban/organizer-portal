@@ -129,6 +129,30 @@ function confirmAction(message) {
   return window.confirm(message);
 }
 
+/* ── Sign-out confirmation modal ── */
+function showSignOutModal() {
+  if (!document.getElementById('signout-modal')) {
+    const el = document.createElement('div');
+    el.id = 'signout-modal';
+    el.className = 'dialog-overlay hidden';
+    el.innerHTML = `
+      <div class="dialog" style="max-width:22rem;text-align:center;">
+        <div style="display:flex;align-items:center;justify-content:center;width:3rem;height:3rem;border-radius:9999px;background:#fef2f2;margin:0 auto 1rem;">
+          <i data-lucide="log-out" style="width:1.25rem;height:1.25rem;color:#dc2626;"></i>
+        </div>
+        <div class="dialog-title" style="text-align:center;">Sign out?</div>
+        <div class="dialog-description" style="text-align:center;">You will be returned to the login page.</div>
+        <div class="dialog-footer" style="justify-content:center;">
+          <button class="btn btn-secondary" onclick="closeDialog('signout-modal')">Cancel</button>
+          <button class="btn btn-destructive" onclick="signOut()">Sign out</button>
+        </div>
+      </div>`;
+    document.body.appendChild(el);
+    refreshIcons();
+  }
+  openDialog('signout-modal');
+}
+
 /* ── Status badge HTML ── */
 function statusBadge(status) {
   const map = {
