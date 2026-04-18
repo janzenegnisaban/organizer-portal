@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard — KaliArena Organizer</title>
+  <link rel="icon" href="favicon.png">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <div class="loading-overlay" id="loading-overlay"><div class="spinner"></div></div>
+
+  <div class="app-shell hidden" id="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-logo"><span class="sidebar-logo-text">KaliArena</span></div>
+      <div class="sidebar-badge-area" id="sidebar-badge"></div>
+      <nav class="sidebar-nav" id="sidebar-nav"></nav>
+    </aside>
+
+    <div class="main-content">
+      <header class="portal-header">
+        <div class="header-left">
+          <div class="header-title">Organizer Dashboard</div>
+        </div>
+        <div class="header-right">
+          <span class="header-user-name" id="header-user-name"></span>
+          <div class="header-avatar" id="header-avatar">?</div>
+        </div>
+      </header>
+
+      <main class="page-content">
+        <div class="page-wrap">
+          <div class="page-header">
+            <div class="page-header-text">
+              <h1 class="page-title" id="welcome-title">Dashboard</h1>
+              <p class="page-subtitle">Manage your competitions and match notifications.</p>
+            </div>
+            <a href="events.html" class="btn btn-primary"><i data-lucide="plus"></i> Create Event</a>
+          </div>
+
+          <div class="stats-grid-3">
+            <div class="stat-card"><div class="stat-icon tile-emerald"><i data-lucide="calendar-days"></i></div><div class="stat-label">My Events</div><div class="stat-value" id="stat-events">—</div></div>
+            <div class="stat-card"><div class="stat-icon tile-amber"><i data-lucide="bell"></i></div><div class="stat-label">Pending Notifications</div><div class="stat-value" id="stat-notifs">—</div></div>
+            <div class="stat-card"><div class="stat-icon tile-blue"><i data-lucide="users"></i></div><div class="stat-label">Registered Coaches</div><div class="stat-value" id="stat-coaches">—</div></div>
+          </div>
+
+          <div class="grid-2">
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title"><i data-lucide="calendar-days"></i> My Recent Events</div>
+              </div>
+              <div class="card-content" id="recent-events">
+                <div class="empty-state" style="padding:1.5rem;"><i data-lucide="calendar-days"></i><h3>No events yet</h3><p style="font-size:.8125rem;">Create your first competition.</p></div>
+              </div>
+              <div class="card-footer">
+                <a href="events.html" class="btn btn-secondary btn-sm">View all events</a>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title"><i data-lucide="zap"></i> Quick Actions</div>
+              </div>
+              <div class="card-content" style="display:flex;flex-direction:column;gap:.5rem;">
+                <a href="events.html"        class="btn btn-secondary" style="justify-content:flex-start;"><i data-lucide="plus"></i> Create New Event</a>
+                <a href="notifications.html" class="btn btn-secondary" style="justify-content:flex-start;"><i data-lucide="bell"></i> Submit Match Notification</a>
+                <a href="teams.html"         class="btn btn-secondary" style="justify-content:flex-start;"><i data-lucide="users"></i> View Registered Teams</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <nav class="mobile-nav" id="mobile-nav"></nav>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/supabase-client.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/nav.js"></script>
+  <script>
+    const PAGE = 'dashboard.html';
+
+    async function init() {
+      const ctx = await requireRole();
+      if (!ctx) return;
+      const { session, profile } = ctx;
+
+      renderNav(PAGE);
+      setHeaderUser(profile);
+
+      const name = profile.first_name || profile.email?.split('@')[0] || 'Organizer';
+      document.getElementById('welcome-title').textContent = `Welcome, ${name}`;
+
+      const [eventsRes, notifsRes, regsRes] = await Promise.all([
+        window.db.from('competitions').select('id, name, status, admin_approval_status, created_at').eq('organizer_id', session.user.id).order('created_at', { ascending: false }),
+        window.db.from('match_notifications').select('id', { count: 'exact', head: true }).eq('created_by', session.user.id).eq('status', 'pending'),
+        window.db.from('competition_registrations').select('id', { count: 'exact', head: true }),
+      ]);
+
+      const events = eventsRes.data || [];
+      document.getElementById('stat-events').textContent = events.length;
+      document.getElementById('stat-notifs').textContent = notifsRes.count ?? 0;
+      document.getElementById('stat-coaches').textContent = regsRes.count ?? 0;
+
+      if (events.length > 0) {
+        document.getElementById('recent-events').innerHTML = events.slice(0, 4).map(ev => `
+          <div class="flex items-center gap-3" style="padding:.5rem 0;border-bottom:1px solid var(--border);">
+            <div class="stat-icon tile-emerald" style="width:2rem;height:2rem;border-radius:.5rem;flex-shrink:0;"><i data-lucide="calendar-days" style="width:.875rem;height:.875rem;"></i></div>
+            <div class="flex-1 truncate">
+              <div class="font-medium text-sm truncate">${escHtml(ev.name)}</div>
+              <div class="text-xs text-muted">${formatDate(ev.created_at)}</div>
+            </div>
+            ${statusBadge(ev.admin_approval_status || ev.status)}
+          </div>
+        `).join('');
+      }
+
+      showApp();
+      refreshIcons();
+    }
+
+    init();
+  </script>
+</body>
+</html>

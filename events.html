@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Events — KaliArena Organizer</title>
+  <link rel="icon" href="favicon.png">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <div class="loading-overlay" id="loading-overlay"><div class="spinner"></div></div>
+
+  <!-- Create Event Dialog -->
+  <div class="dialog-overlay hidden" id="event-dialog">
+    <div class="dialog" style="max-width:36rem;">
+      <div class="dialog-title" id="event-dialog-title">Create Event</div>
+      <form id="event-form">
+        <input type="hidden" id="event-id">
+        <div class="form-group">
+          <label class="form-label">Event Name *</label>
+          <input type="text" id="ev-name" class="form-input" placeholder="e.g. Regional Arnis Championship 2026" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Description</label>
+          <textarea id="ev-desc" class="form-input" placeholder="About this competition…"></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Start Date *</label>
+            <input type="date" id="ev-start" class="form-input" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">End Date</label>
+            <input type="date" id="ev-end" class="form-input">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Location</label>
+            <input type="text" id="ev-location" class="form-input" placeholder="Venue, City">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Competition Type</label>
+            <input type="text" id="ev-type" class="form-input" placeholder="e.g. Single Stick, Doble Baston">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Max Teams</label>
+            <input type="number" id="ev-maxteams" class="form-input" placeholder="e.g. 32" min="2">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Registration Deadline</label>
+            <input type="date" id="ev-deadline" class="form-input">
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:1.25rem;">
+          <label style="display:flex;align-items:center;gap:.625rem;font-size:.875rem;cursor:pointer;">
+            <input type="checkbox" id="ev-public" style="width:1rem;height:1rem;accent-color:var(--primary);" checked>
+            Make this event public (visible to coaches after admin approval)
+          </label>
+        </div>
+        <div class="alert alert-info" style="margin-bottom:1.25rem;font-size:.8125rem;">
+          <i data-lucide="info" style="width:.875rem;height:.875rem;flex-shrink:0;"></i>
+          New events require admin approval before coaches can see and join them.
+        </div>
+        <div class="dialog-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeDialog('event-dialog')">Cancel</button>
+          <button type="submit" id="event-submit" class="btn btn-primary">Create Event</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="app-shell hidden" id="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-logo"><span class="sidebar-logo-text">KaliArena</span></div>
+      <div class="sidebar-badge-area" id="sidebar-badge"></div>
+      <nav class="sidebar-nav" id="sidebar-nav"></nav>
+    </aside>
+
+    <div class="main-content">
+      <header class="portal-header">
+        <div class="header-left"><div class="header-title">Events</div></div>
+        <div class="header-right">
+          <span class="header-user-name" id="header-user-name"></span>
+          <div class="header-avatar" id="header-avatar">?</div>
+        </div>
+      </header>
+
+      <main class="page-content">
+        <div class="page-wrap">
+          <div class="page-header">
+            <div class="page-header-text">
+              <h1 class="page-title">My Events</h1>
+              <p class="page-subtitle">Create and manage your competitions. New events require admin approval before coaches can see them.</p>
+            </div>
+            <button class="btn btn-primary" onclick="openCreateDialog()"><i data-lucide="plus"></i> Create Event</button>
+          </div>
+
+          <div id="events-list">
+            <div class="text-sm text-muted">Loading…</div>
+          </div>
+        </div>
+      </main>
+
+      <nav class="mobile-nav" id="mobile-nav"></nav>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/supabase-client.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/nav.js"></script>
+  <script>
+    const PAGE = 'events.html';
+    let orgId;
+    let allEvents = [];
+
+    async function init() {
+      const ctx = await requireRole();
+      if (!ctx) return;
+      orgId = ctx.session.user.id;
+      renderNav(PAGE);
+      setHeaderUser(ctx.profile);
+      await loadEvents();
+      showApp();
+      refreshIcons();
+    }
+
+    async function loadEvents() {
+      const { data, error } = await window.db
+        .from('competitions')
+        .select('*, competition_registrations(id)')
+        .eq('organizer_id', orgId)
+        .order('created_at', { ascending: false });
+
+      allEvents = data || [];
+      const container = document.getElementById('events-list');
+
+      if (allEvents.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <i data-lucide="calendar-days"></i>
+            <h3>No events yet</h3>
+            <p>Create your first competition to get started.</p>
+            <button class="btn btn-primary btn-sm" style="margin-top:.875rem;" onclick="openCreateDialog()"><i data-lucide="plus"></i> Create Event</button>
+          </div>`;
+        refreshIcons(); return;
+      }
+
+      container.innerHTML = `<div style="display:flex;flex-direction:column;gap:.875rem;">` +
+        allEvents.map(ev => {
+          const approval = ev.admin_approval_status || 'pending';
+          const regCount = ev.competition_registrations?.length || 0;
+          return `
+            <div class="card">
+              <div class="card-content" style="padding:1.125rem;">
+                <div class="flex items-start justify-between gap-3 flex-wrap">
+                  <div class="flex-1">
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <span class="font-semibold">${escHtml(ev.name)}</span>
+                      ${statusBadge(approval)}
+                      ${statusBadge(ev.status)}
+                    </div>
+                    ${ev.description ? `<p class="text-sm text-muted mt-1">${escHtml(ev.description)}</p>` : ''}
+                    <div class="flex gap-4 text-xs text-muted mt-2 flex-wrap">
+                      ${ev.location ? `<span><i data-lucide="map-pin" style="width:.75rem;height:.75rem;display:inline;vertical-align:middle;"></i> ${escHtml(ev.location)}</span>` : ''}
+                      <span><i data-lucide="calendar" style="width:.75rem;height:.75rem;display:inline;vertical-align:middle;"></i> ${formatDate(ev.start_date)}${ev.end_date ? ' – ' + formatDate(ev.end_date) : ''}</span>
+                      <span><i data-lucide="users" style="width:.75rem;height:.75rem;display:inline;vertical-align:middle;"></i> ${regCount} registered</span>
+                    </div>
+                    ${approval === 'rejected' && ev.rejection_reason ? `
+                      <div class="alert alert-error" style="margin-top:.75rem;font-size:.8125rem;padding:.625rem .75rem;">
+                        <i data-lucide="x-circle" style="width:.875rem;height:.875rem;flex-shrink:0;"></i>
+                        Rejection reason: ${escHtml(ev.rejection_reason)}
+                      </div>
+                    ` : ''}
+                  </div>
+                  <div class="flex gap-2">
+                    <button class="btn btn-secondary btn-sm" onclick="deleteEvent('${ev.id}', '${escHtml(ev.name)}')" title="Delete">
+                      <i data-lucide="trash-2"></i>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('') + `</div>`;
+
+      refreshIcons();
+    }
+
+    function openCreateDialog() {
+      document.getElementById('event-dialog-title').textContent = 'Create Event';
+      document.getElementById('event-id').value = '';
+      document.getElementById('event-form').reset();
+      document.getElementById('ev-public').checked = true;
+      openDialog('event-dialog');
+    }
+
+    async function deleteEvent(id, name) {
+      if (!confirmAction(`Delete event "${name}"? This cannot be undone.`)) return;
+      const { error } = await window.db.from('competitions').delete().eq('id', id).eq('organizer_id', orgId);
+      if (error) { showToast('Failed to delete: ' + error.message, 'error'); return; }
+      showToast('Event deleted.', 'success');
+      loadEvents();
+    }
+
+    document.getElementById('event-form').addEventListener('submit', async e => {
+      e.preventDefault();
+      const btn = document.getElementById('event-submit');
+      btn.disabled = true; btn.textContent = 'Creating…';
+
+      const payload = {
+        name:                  document.getElementById('ev-name').value,
+        description:           document.getElementById('ev-desc').value || null,
+        start_date:            document.getElementById('ev-start').value || null,
+        end_date:              document.getElementById('ev-end').value || null,
+        location:              document.getElementById('ev-location').value || null,
+        competition_type:      document.getElementById('ev-type').value || null,
+        max_teams:             parseInt(document.getElementById('ev-maxteams').value) || null,
+        registration_deadline: document.getElementById('ev-deadline').value || null,
+        is_public:             document.getElementById('ev-public').checked,
+        organizer_id:          orgId,
+        status:               'upcoming',
+        admin_approval_status: 'pending',
+      };
+
+      const { error } = await window.db.from('competitions').insert(payload);
+      btn.disabled = false; btn.textContent = 'Create Event';
+
+      if (error) { showToast(error.message || 'Failed to create event.', 'error'); return; }
+      showToast('Event created! Awaiting admin approval.', 'success');
+      closeDialog('event-dialog');
+      loadEvents();
+    });
+
+    init();
+  </script>
+</body>
+</html>

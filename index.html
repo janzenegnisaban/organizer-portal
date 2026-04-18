@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign In — KaliArena Organizer Portal</title>
+  <link rel="icon" href="favicon.png">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <div class="auth-page">
+    <div class="auth-card">
+      <div class="auth-logo">
+        <div class="auth-logo-text">KaliArena</div>
+        <div class="auth-logo-sub">Organizer Portal</div>
+      </div>
+
+      <div style="text-align:center;margin-bottom:1.25rem;">
+        <span class="badge badge-emerald" style="font-size:.8125rem;padding:.25rem .75rem;">
+          <i data-lucide="settings" style="width:.875rem;height:.875rem;"></i> Organizer Access
+        </span>
+      </div>
+
+      <div id="error-msg" class="alert alert-error hidden" style="margin-bottom:1rem;"></div>
+
+      <h1 class="auth-title">Organizer sign in</h1>
+      <p class="auth-subtitle">Create and manage competitions</p>
+
+      <form id="login-form">
+        <div class="form-group">
+          <label class="form-label" for="email">Email address</label>
+          <input type="email" id="email" class="form-input" placeholder="organizer@example.com" required autocomplete="email">
+        </div>
+        <div class="form-group" style="margin-bottom:1.25rem;">
+          <label class="form-label" for="password">Password</label>
+          <input type="password" id="password" class="form-input" placeholder="Your password" required autocomplete="current-password">
+        </div>
+        <button type="submit" id="submit-btn" class="btn btn-primary btn-lg">Sign in</button>
+      </form>
+
+      <p style="text-align:center;margin-top:1.25rem;font-size:.875rem;color:var(--muted-foreground);">
+        Need an account? <a href="signup.html" style="color:var(--primary);font-weight:500;">Register here</a>
+      </p>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/supabase-client.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/auth.js"></script>
+  <script>
+    lucide.createIcons();
+    redirectIfLoggedIn();
+
+    document.getElementById('login-form').addEventListener('submit', async e => {
+      e.preventDefault();
+      const btn = document.getElementById('submit-btn');
+      const err = document.getElementById('error-msg');
+      btn.textContent = 'Signing in…';
+      btn.disabled = true;
+      err.classList.add('hidden');
+
+      const result = await signIn(
+        document.getElementById('email').value,
+        document.getElementById('password').value
+      );
+
+      if (result.error) {
+        err.textContent = result.error;
+        err.classList.remove('hidden');
+        btn.textContent = 'Sign in';
+        btn.disabled = false;
+      } else {
+        window.location.href = 'dashboard.html';
+      }
+    });
+  </script>
+</body>
+</html>

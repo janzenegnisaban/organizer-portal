@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign Up — KaliArena Organizer Portal</title>
+  <link rel="icon" href="favicon.png">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <div class="auth-page">
+    <div class="auth-card" style="max-width:32rem;">
+      <div class="auth-logo">
+        <div class="auth-logo-text">KaliArena</div>
+        <div class="auth-logo-sub">Organizer Account Registration</div>
+      </div>
+
+      <div class="alert alert-info" style="margin-bottom:1.25rem;">
+        <i data-lucide="info" style="width:1rem;height:1rem;flex-shrink:0;"></i>
+        Create your account below. An Admin must then assign you the organizer role via the Super Admin panel.
+      </div>
+
+      <div id="success-msg" class="alert alert-success hidden" style="margin-bottom:1rem;"></div>
+      <div id="error-msg"   class="alert alert-error hidden"   style="margin-bottom:1rem;"></div>
+
+      <form id="signup-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="first-name">First name</label>
+            <input type="text" id="first-name" class="form-input" placeholder="Maria" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="last-name">Last name</label>
+            <input type="text" id="last-name" class="form-input" placeholder="Santos" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="email">Email address</label>
+          <input type="email" id="email" class="form-input" placeholder="organizer@example.com" required autocomplete="email">
+        </div>
+        <div class="form-group" style="margin-bottom:1.25rem;">
+          <label class="form-label" for="password">Password</label>
+          <input type="password" id="password" class="form-input" placeholder="Min. 8 characters" required minlength="8" autocomplete="new-password">
+        </div>
+        <button type="submit" id="submit-btn" class="btn btn-primary btn-lg">Create Account</button>
+      </form>
+
+      <p style="text-align:center;margin-top:1.25rem;font-size:.875rem;color:var(--muted-foreground);">
+        Already have an account? <a href="index.html" style="color:var(--primary);font-weight:500;">Sign in</a>
+      </p>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/supabase-client.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/auth.js"></script>
+  <script>
+    lucide.createIcons();
+
+    document.getElementById('signup-form').addEventListener('submit', async e => {
+      e.preventDefault();
+      const btn = document.getElementById('submit-btn');
+      const err = document.getElementById('error-msg');
+      const suc = document.getElementById('success-msg');
+      btn.textContent = 'Registering…';
+      btn.disabled = true;
+      err.classList.add('hidden');
+      suc.classList.add('hidden');
+
+      const result = await signUp(
+        document.getElementById('email').value,
+        document.getElementById('password').value,
+        document.getElementById('first-name').value,
+        document.getElementById('last-name').value
+      );
+
+      if (result.error) {
+        err.textContent = result.error;
+        err.classList.remove('hidden');
+        btn.textContent = 'Create Account';
+        btn.disabled = false;
+      } else {
+        suc.textContent = 'Account created! Confirm your email, then contact an Admin to assign your organizer role.';
+        suc.classList.remove('hidden');
+        document.getElementById('signup-form').reset();
+        btn.textContent = 'Create Account';
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

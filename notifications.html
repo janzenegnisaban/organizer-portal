@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Match Notifications — KaliArena Organizer</title>
+  <link rel="icon" href="favicon.png">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <div class="loading-overlay" id="loading-overlay"><div class="spinner"></div></div>
+
+  <!-- Create Notification Dialog -->
+  <div class="dialog-overlay hidden" id="notif-dialog">
+    <div class="dialog" style="max-width:34rem;">
+      <div class="dialog-title">Submit Match Notification</div>
+      <div class="dialog-description">Notify coaches of an upcoming match. An admin must approve it before coaches can see it.</div>
+      <form id="notif-form">
+        <div class="form-group">
+          <label class="form-label">Notification Title *</label>
+          <input type="text" id="n-title" class="form-input" placeholder="e.g. Semi-Finals — Boys Under 16" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Court / Venue</label>
+            <input type="text" id="n-court" class="form-input" placeholder="e.g. Court A">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Scheduled Date & Time *</label>
+            <input type="datetime-local" id="n-scheduled" class="form-input" required>
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:1.25rem;">
+          <label class="form-label">Competition (optional)</label>
+          <select id="n-competition" class="form-select">
+            <option value="">Select competition…</option>
+          </select>
+        </div>
+        <div class="alert alert-info" style="margin-bottom:1.25rem;font-size:.8125rem;">
+          <i data-lucide="info" style="width:.875rem;height:.875rem;flex-shrink:0;"></i>
+          Submitted notifications are reviewed by an admin before coaches can view them.
+        </div>
+        <div class="dialog-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeDialog('notif-dialog')">Cancel</button>
+          <button type="submit" id="notif-submit" class="btn btn-primary">Submit Notification</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="app-shell hidden" id="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-logo"><span class="sidebar-logo-text">KaliArena</span></div>
+      <div class="sidebar-badge-area" id="sidebar-badge"></div>
+      <nav class="sidebar-nav" id="sidebar-nav"></nav>
+    </aside>
+
+    <div class="main-content">
+      <header class="portal-header">
+        <div class="header-left"><div class="header-title">Match Notifications</div></div>
+        <div class="header-right">
+          <span class="header-user-name" id="header-user-name"></span>
+          <div class="header-avatar" id="header-avatar">?</div>
+        </div>
+      </header>
+
+      <main class="page-content">
+        <div class="page-wrap">
+          <div class="page-header">
+            <div class="page-header-text">
+              <h1 class="page-title">Match Notifications</h1>
+              <p class="page-subtitle">Submit match details to notify coaches. All notifications require admin approval before they reach coaches.</p>
+            </div>
+            <button class="btn btn-primary" onclick="openNotifDialog()"><i data-lucide="plus"></i> Submit Notification</button>
+          </div>
+
+          <div id="notif-list">
+            <div class="text-sm text-muted">Loading…</div>
+          </div>
+        </div>
+      </main>
+
+      <nav class="mobile-nav" id="mobile-nav"></nav>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/supabase-client.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/nav.js"></script>
+  <script>
+    const PAGE = 'notifications.html';
+    let orgId;
+    let myEvents = [];
+
+    async function init() {
+      const ctx = await requireRole();
+      if (!ctx) return;
+      orgId = ctx.session.user.id;
+      renderNav(PAGE);
+      setHeaderUser(ctx.profile);
+
+      const { data: events } = await window.db
+        .from('competitions')
+        .select('id, name')
+        .eq('organizer_id', orgId)
+        .order('name');
+      myEvents = events || [];
+
+      // Populate select
+      const sel = document.getElementById('n-competition');
+      myEvents.forEach(ev => {
+        const opt = document.createElement('option');
+        opt.value = ev.id; opt.textContent = ev.name;
+        sel.appendChild(opt);
+      });
+
+      await loadNotifs();
+      showApp();
+      refreshIcons();
+    }
+
+    async function loadNotifs() {
+      const { data } = await window.db
+        .from('match_notifications')
+        .select('*, competitions(name)')
+        .eq('created_by', orgId)
+        .order('created_at', { ascending: false });
+
+      const notifs = data || [];
+      const container = document.getElementById('notif-list');
+
+      if (notifs.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <i data-lucide="bell"></i>
+            <h3>No notifications submitted</h3>
+            <p>Submit your first match notification above.</p>
+          </div>`;
+        refreshIcons(); return;
+      }
+
+      container.innerHTML = `<div style="display:flex;flex-direction:column;gap:.75rem;">` +
+        notifs.map(n => `
+          <div class="card">
+            <div class="card-content" style="padding:1rem;">
+              <div class="flex items-start gap-3">
+                <div class="stat-icon tile-amber" style="width:2.5rem;height:2.5rem;border-radius:.75rem;flex-shrink:0;margin-top:.125rem;">
+                  <i data-lucide="bell"></i>
+                </div>
+                <div class="flex-1">
+                  <div class="flex items-start justify-between gap-2 flex-wrap">
+                    <span class="font-semibold">${escHtml(n.title)}</span>
+                    ${statusBadge(n.status)}
+                  </div>
+                  <div class="text-sm text-muted mt-1 flex gap-3 flex-wrap">
+                    ${n.court ? `<span>Court <strong>${escHtml(n.court)}</strong></span>` : ''}
+                    ${n.scheduled_at ? `<span>${formatDateTime(n.scheduled_at)}</span>` : ''}
+                    ${n.competitions?.name ? `<span>${escHtml(n.competitions.name)}</span>` : ''}
+                  </div>
+                  <div class="text-xs text-muted mt-1">Submitted ${timeAgo(n.created_at)}</div>
+                  ${n.status === 'pending' ? `<div class="alert alert-warning" style="margin-top:.75rem;font-size:.8125rem;padding:.5rem .75rem;"><i data-lucide="clock" style="width:.875rem;height:.875rem;flex-shrink:0;"></i> Awaiting admin review</div>` : ''}
+                </div>
+                ${n.status === 'pending' ? `
+                  <button class="btn btn-ghost btn-icon btn-sm" style="color:var(--destructive)" onclick="deleteNotif('${n.id}')" title="Delete">
+                    <i data-lucide="trash-2"></i>
+                  </button>
+                ` : ''}
+              </div>
+            </div>
+          </div>
+        `).join('') + `</div>`;
+
+      refreshIcons();
+    }
+
+    function openNotifDialog() {
+      document.getElementById('notif-form').reset();
+      openDialog('notif-dialog');
+    }
+
+    async function deleteNotif(id) {
+      if (!confirmAction('Delete this notification?')) return;
+      const { error } = await window.db.from('match_notifications').delete().eq('id', id).eq('created_by', orgId);
+      if (error) { showToast('Failed: ' + error.message, 'error'); return; }
+      showToast('Notification deleted.', 'success');
+      loadNotifs();
+    }
+
+    document.getElementById('notif-form').addEventListener('submit', async e => {
+      e.preventDefault();
+      const btn = document.getElementById('notif-submit');
+      btn.disabled = true; btn.textContent = 'Submitting…';
+
+      const compId = document.getElementById('n-competition').value;
+      const { error } = await window.db.from('match_notifications').insert({
+        title:          document.getElementById('n-title').value,
+        court:          document.getElementById('n-court').value || null,
+        scheduled_at:   document.getElementById('n-scheduled').value || null,
+        competition_id: compId || null,
+        created_by:     orgId,
+        status:         'pending',
+      });
+
+      btn.disabled = false; btn.textContent = 'Submit Notification';
+      if (error) { showToast(error.message || 'Failed to submit.', 'error'); return; }
+      showToast('Notification submitted! Awaiting admin approval.', 'success');
+      closeDialog('notif-dialog');
+      loadNotifs();
+    });
+
+    init();
+  </script>
+</body>
+</html>
